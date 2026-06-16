@@ -22,8 +22,9 @@ module spike_fifo #(
 );
     // Inferred BRAM FIFO
     logic [ADDR_WIDTH-1:0] mem [FIFO_DEPTH];
-    logic [ADDR_WIDTH-1:0] wr_ptr, rd_ptr;
-    logic [ADDR_WIDTH:0]   internal_count;
+    localparam PTR_WIDTH = $clog2(FIFO_DEPTH);
+    logic [PTR_WIDTH-1:0] wr_ptr, rd_ptr;
+    logic [PTR_WIDTH:0]   internal_count;
 
     assign count = internal_count;
     assign full  = (internal_count == FIFO_DEPTH);

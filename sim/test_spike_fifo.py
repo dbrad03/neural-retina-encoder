@@ -33,10 +33,10 @@ async def test_fifo_simultaneous_rw_full(dut):
     assert dut.full.value == 1, "FIFO should be full"
     assert dut.overflow_seen.value == 0, "Overflow should not be seen yet"
     
-    # 2. In one cycle, assert rd_en=1, wr_en=1, din=15
+    # 2. In one cycle, assert rd_en=1, wr_en=1, din=99
     dut.rd_en.value = 1
     dut.wr_en.value = 1
-    dut.din.value = 15
+    dut.din.value = 99
     
     dut._log.info(f"Before clock: full={dut.full.value}, empty={dut.empty.value}, wr_ptr={dut.wr_ptr.value}, rd_ptr={dut.rd_ptr.value}")
     
@@ -67,8 +67,8 @@ async def test_fifo_simultaneous_rw_full(dut):
     
     await RisingEdge(dut.clk)
     
-    # 4. Expected sequence: 0..15, 15 (except 0 was popped during the simultaneous cycle)
-    expected = list(range(16)) + [15]
+    # 4. Expected sequence: 0..15, 99 (except 0 was popped during the simultaneous cycle)
+    expected = list(range(16)) + [99]
     assert results == expected, f"Expected {expected}, got {results}"
     
     assert dut.overflow_seen.value == 0, "Overflow was incorrectly set during simultaneous read/write!"
@@ -89,7 +89,7 @@ def fifo_runner():
         hdl_toplevel=hdl_toplevel,
         always=True,
         timescale=("1ns", "1ps"),
-        parameters={"FIFO_DEPTH": 16, "ADDR_WIDTH": 4}
+        parameters={"FIFO_DEPTH": 16, "ADDR_WIDTH": 8}
     )
     runner.test(
         hdl_toplevel=hdl_toplevel,

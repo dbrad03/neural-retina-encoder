@@ -26,10 +26,13 @@ async def test_foveation_zones(dut):
     dut.rst_n.value = 1
     await RisingEdge(dut.clk)
     
-    # Addr 1: Center of the diamond (x=64, y=64). 64 + 64*128 = 8256. (Inside fovea)
-    addr_midget = 64 * 128 + 64
-    # Addr 2: Edge of the screen (x=0, y=0). 0. (Outside fovea)
-    addr_parasol = 0
+    # We need to test specific boundaries. The diamond is defined as |x - 64| + |y - 64| < 45.
+    # Boundary points:
+    # 1. x=64, y=108 => |0| + |44| = 44 < 45 (Midget edge)
+    # 2. x=64, y=109 => |0| + |45| = 45 >= 45 (Parasol edge)
+    
+    addr_midget = 64 + 108 * 128
+    addr_parasol = 64 + 109 * 128
     
     # Force V to Threshold
     v_thresh_s = 0x07800
@@ -63,10 +66,10 @@ async def test_foveation_zones(dut):
     expected_midget_u = c2s(IZH_D)
     expected_parasol_u = c2s(IZH_D_PARASOL)
     
-    assert midget_u_next == expected_midget_u, f"Midget U mismatch: Expected {expected_midget_u:05X}, Got {midget_u_next:05X}"
-    assert parasol_u_next == expected_parasol_u, f"Parasol U mismatch: Expected {expected_parasol_u:05X}, Got {parasol_u_next:05X}"
+    assert midget_u_next == expected_midget_u, f"Midget boundary U mismatch: Expected {expected_midget_u:05X}, Got {midget_u_next:05X}"
+    assert parasol_u_next == expected_parasol_u, f"Parasol boundary U mismatch: Expected {expected_parasol_u:05X}, Got {parasol_u_next:05X}"
     
-    dut._log.info("Foveation Behavioral Test PASSED! Midgets and Parasols correctly assigned.")
+    dut._log.info("Foveation Exact Boundary Test PASSED! Midgets and Parasols correctly assigned at |x-64| + |y-64| == 45 bounds.")
 
 def foveation_runner():
     from cocotb_tools.runner import get_runner

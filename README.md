@@ -52,8 +52,8 @@ cargo run
 ## Status & Accomplishments
 
 The full RTL architecture is implemented and **Pre-silicon verified through RTL simulation, synthesis, and routed implementation.**
-- **100MHz Timing Closure:** Implemented a deeply-optimized 6-stage execution pipeline to hit 100MHz FMAX on a Zynq-7000 (Zybo Z7-20). A single pipelined neuron engine is time-multiplexed across 16,384 neuron states per frame; Vivado maps the datapath to 6 DSP48E1 slices.
+- **100MHz Timing Closure:** Implemented a deeply-optimized 6-stage execution pipeline to hit 100MHz FMAX on a Zynq-7000 (Zybo Z7-20). A single pipelined neuron engine is time-multiplexed across 16,384 neuron states per frame; Vivado maps the datapath to 6 DSP48E1 slices *(Note: numbers reflect last routed implementation before Phase 2 RTL changes)*.
 - **AXI-Lite & AXI-Stream Integration:** The hardware engine is wrapped in standard AMBA AXI interfaces. AXI-Lite is used for memory-mapped pixel stimulus and control, while AXI-Stream is used for the high-bandwidth 16-bit spike output.
 - **Zynq SoC Block Design:** A fully automated Vivado `build_bd.tcl` script is provided to generate the entire hardware system, connecting the PL (Programmable Logic) retina IP to the PS (Processing System) ARM cores.
 - **Software Driver:** Includes both a bare-metal Python driver and a high-performance **C++ OpenCV Driver** (`sw/c_driver/main.cpp`) that captures a live physical USB webcam feed, pushes it directly into the FPGA via `/dev/mem`, and streams the biological spikes over UDP.
-- **Verification Coverage:** Completely covered by Cocotb regression. Verifies the biological engine, full-frame controller, Foveation, AXI stress testing, interrupts, and backpressure/overflow handling against a golden Python scoreboard.
+- **Verification Coverage:** Strongly verified by Cocotb regression. Verifies the biological engine, full-frame controller, Foveation, AXI stress testing, interrupts, and backpressure/overflow handling against a golden Python scoreboard.

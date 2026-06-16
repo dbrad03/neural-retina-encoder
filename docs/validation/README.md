@@ -2,4 +2,4 @@
 
 This repository currently contains pre-silicon RTL simulation, Vivado synthesis, and routed implementation evidence. Physical Zybo Z7-20 board validation is pending hardware arrival.
 
-The reports in this directory are extracted directly from the Vivado `impl_1` run for the `xc7z020clg400-1` device (specifically `vivado/zynq_retina/zynq_retina.runs/impl_1/system_wrapper_*` reports).
+The reports in this directory are extracted directly from the Vivado `impl_1` run for the `xc7z020clg400-1` device (specifically `vivado/zynq_retina/zynq_retina.runs/impl_1/system_wrapper_*` reports). Note: These represent the last routed hardware implementation before Phase 2 RTL changes (foveation, backpressure fixes, and AXI stress fixes) were introduced.

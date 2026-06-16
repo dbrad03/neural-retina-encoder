@@ -72,8 +72,8 @@ module neuron_array_controller #(
 
     generate
         if (ADDR_WIDTH >= 14) begin : gen_fovea_coords
-            assign x_coord = scan_cnt[6:0];
-            assign y_coord = scan_cnt[13:7];
+            assign x_coord = rd_addr[6:0];
+            assign y_coord = rd_addr[13:7];
         end else begin : gen_fovea_fallback
             assign x_coord = 7'd64; // Fallback for small tests
             assign y_coord = 7'd64;
