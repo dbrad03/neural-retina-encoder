@@ -78,8 +78,8 @@ module axi_retina_wrapper #(
     logic frame_done_wire;
     logic frame_done_reg;
     
-    // Directly output the 1-cycle pulse from the controller as our hardware interrupt
-    assign frame_done_irq = frame_done_wire;
+    // Output the latched register as our hardware interrupt
+    assign frame_done_irq = frame_done_reg;
     
     logic start_frame_d;
     always_ff @(posedge aclk or negedge aresetn) begin
@@ -89,6 +89,9 @@ module axi_retina_wrapper #(
     assign start_frame_pulse = start_frame_reg & ~start_frame_d;
     
     // start_frame_reg logic moved to AXI write block
+
+    logic overflow_seen_wire;
+    logic clear_overflow_reg;
 
     //-----------------------------------------
     // Controller Instance
@@ -110,13 +113,14 @@ module axi_retina_wrapper #(
         .v_next_s(),
         .u_next_s(),
         .dbg_wr_addr(),
-        .dbg_we_state()
+        .dbg_we_state(),
+        .overflow_seen(overflow_seen_wire),
+        .clear_overflow(clear_overflow_reg)
     );
 
     //-----------------------------------------
     // AXI4-Lite Slave Logic
     //-----------------------------------------
-    logic aw_en;
     logic axi_awready;
     logic axi_wready;
     logic axi_bvalid;
@@ -133,66 +137,105 @@ module axi_retina_wrapper #(
     assign s_axi_rdata   = axi_rdata;
     assign s_axi_rresp   = 2'b00; // OKAY
 
-    logic [16:0] awaddr;
+    // Decoupled AW/W logic
+    logic [16:0] awaddr_reg;
+    logic awvalid_reg, wvalid_reg;
+    logic [31:0] wdata_reg;
+    logic [3:0]  wstrb_reg;
+
     always_ff @(posedge aclk or negedge aresetn) begin
         if (!aresetn) begin
             axi_awready <= 1'b0;
-            axi_wready  <= 1'b0;
-            aw_en       <= 1'b1;
-            awaddr      <= 17'd0;
+            awvalid_reg <= 1'b0;
+            awaddr_reg  <= 17'd0;
         end else begin
-            if (~axi_awready && s_axi_awvalid && s_axi_wvalid && aw_en) begin
+            if (~axi_awready && s_axi_awvalid && ~awvalid_reg) begin
                 axi_awready <= 1'b1;
-                axi_wready  <= 1'b1;
-                aw_en       <= 1'b0;
-                awaddr      <= s_axi_awaddr;
-            end else if (s_axi_bready && axi_bvalid) begin
-                aw_en       <= 1'b1;
+                awvalid_reg <= 1'b1;
+                awaddr_reg  <= s_axi_awaddr;
+            end else if (axi_bvalid && s_axi_bready) begin
+                awvalid_reg <= 1'b0;
                 axi_awready <= 1'b0;
-                axi_wready  <= 1'b0;
             end else begin
                 axi_awready <= 1'b0;
-                axi_wready  <= 1'b0;
+            end
+        end
+    end
+
+    always_ff @(posedge aclk or negedge aresetn) begin
+        if (!aresetn) begin
+            axi_wready <= 1'b0;
+            wvalid_reg <= 1'b0;
+            wdata_reg  <= 32'd0;
+            wstrb_reg  <= 4'd0;
+        end else begin
+            if (~axi_wready && s_axi_wvalid && ~wvalid_reg) begin
+                axi_wready <= 1'b1;
+                wvalid_reg <= 1'b1;
+                wdata_reg  <= s_axi_wdata;
+                wstrb_reg  <= s_axi_wstrb;
+            end else if (axi_bvalid && s_axi_bready) begin
+                wvalid_reg <= 1'b0;
+                axi_wready <= 1'b0;
+            end else begin
+                axi_wready <= 1'b0;
             end
         end
     end
 
     always_ff @(posedge aclk or negedge aresetn) begin
         if (!aresetn) axi_bvalid <= 1'b0;
-        else if (axi_awready && s_axi_awvalid && axi_wready && s_axi_wvalid && ~axi_bvalid)
+        else if (awvalid_reg && wvalid_reg && ~axi_bvalid)
             axi_bvalid <= 1'b1;
         else if (s_axi_bready && axi_bvalid)
             axi_bvalid <= 1'b0;
     end
 
     logic slv_reg_wren;
-    assign slv_reg_wren = axi_wready && s_axi_wvalid && axi_awready && s_axi_awvalid;
+    logic write_executed;
+    
+    // We only execute the write ONCE per valid transaction pair.
+    // The transaction is valid when both regs are set, and we haven't asserted bvalid yet.
+    assign slv_reg_wren = awvalid_reg && wvalid_reg && ~write_executed;
+
+    always_ff @(posedge aclk or negedge aresetn) begin
+        if (!aresetn) write_executed <= 1'b0;
+        else if (slv_reg_wren) write_executed <= 1'b1;
+        else if (axi_bvalid && s_axi_bready) write_executed <= 1'b0;
+    end
 
     always_ff @(posedge aclk or negedge aresetn) begin
         if (!aresetn) begin
             start_frame_reg <= 0;
             frame_done_reg  <= 0;
+            clear_overflow_reg <= 0;
         end else begin
-            // Write from AXI takes priority
-            if (slv_reg_wren && (awaddr[16] == 1'b1) && (awaddr[15:0] == 16'h0000)) begin
-                start_frame_reg <= s_axi_wdata[0];
-                if (s_axi_wdata[1]) frame_done_reg <= 0; // Write 1 to bit 1 to clear frame_done
-            end else begin
-                if (start_frame_pulse) start_frame_reg <= 0;
-                if (frame_done_wire)   frame_done_reg  <= 1;
-            end
+            clear_overflow_reg <= 0; // default to pulse
+            
+            // Hardware Sets
+            if (start_frame_pulse) start_frame_reg <= 0;
+            if (frame_done_wire)   frame_done_reg  <= 1; // Latched!
+
+            // Software Writes (Takes priority if simultaneous)
+            if (slv_reg_wren && (awaddr_reg[16] == 1'b1) && (awaddr_reg[15:0] == 16'h0000)) begin
+                if (wstrb_reg[0]) begin
+                    start_frame_reg <= wdata_reg[0];
+                    if (wdata_reg[1]) frame_done_reg <= 0; // Clear on write 1 to bit 1
+                    if (wdata_reg[2]) clear_overflow_reg <= 1; // Send pulse
+                end
+            end 
         end
     end
 
-    logic [16:0] araddr;
+    logic [16:0] araddr_reg;
     always_ff @(posedge aclk or negedge aresetn) begin
         if (!aresetn) begin
             axi_arready <= 1'b0;
-            araddr      <= 17'd0;
+            araddr_reg  <= 17'd0;
         end else begin
-            if (~axi_arready && s_axi_arvalid) begin
+            if (~axi_arready && s_axi_arvalid && (~axi_rvalid || s_axi_rready)) begin
                 axi_arready <= 1'b1;
-                araddr      <= s_axi_araddr;
+                araddr_reg  <= s_axi_araddr;
             end else begin
                 axi_arready <= 1'b0;
             end
@@ -200,7 +243,7 @@ module axi_retina_wrapper #(
     end
 
     logic slv_reg_rden;
-    assign slv_reg_rden = axi_arready && s_axi_arvalid && ~axi_rvalid;
+    assign slv_reg_rden = axi_arready && s_axi_arvalid;
 
     always_ff @(posedge aclk or negedge aresetn) begin
         if (!aresetn) axi_rvalid <= 1'b0;
@@ -209,11 +252,11 @@ module axi_retina_wrapper #(
     end
 
     // BRAM Access Mux
-    assign bram_en_a   = (slv_reg_wren && (awaddr[16] == 1'b0)) || 
-                         (slv_reg_rden && (araddr[16] == 1'b0));
-    assign bram_we_a   = (slv_reg_wren && (awaddr[16] == 1'b0)) ? s_axi_wstrb : 4'd0;
-    assign bram_addr_a = (slv_reg_wren) ? awaddr[15:2] : araddr[15:2];
-    assign bram_din_a  = s_axi_wdata;
+    assign bram_en_a   = (slv_reg_wren && (awaddr_reg[16] == 1'b0)) || 
+                         (slv_reg_rden && (araddr_reg[16] == 1'b0));
+    assign bram_we_a   = (slv_reg_wren && (awaddr_reg[16] == 1'b0)) ? wstrb_reg : 4'd0;
+    assign bram_addr_a = (slv_reg_wren) ? awaddr_reg[15:2] : araddr_reg[15:2];
+    assign bram_din_a  = wdata_reg;
 
     logic [31:0] reg_rdata;
     always_ff @(posedge aclk or negedge aresetn) begin
@@ -221,8 +264,8 @@ module axi_retina_wrapper #(
             reg_rdata <= 32'd0;
         end else begin
             if (slv_reg_rden) begin
-                if (araddr[16] == 1'b1 && araddr[15:0] == 16'h0000)
-                    reg_rdata <= {30'd0, frame_done_reg, start_frame_reg};
+                if (araddr_reg[16] == 1'b1 && araddr_reg[15:0] == 16'h0000)
+                    reg_rdata <= {29'd0, overflow_seen_wire, frame_done_reg, start_frame_reg};
                 else
                     reg_rdata <= 32'd0;
             end
@@ -230,6 +273,6 @@ module axi_retina_wrapper #(
     end
 
     // Mux between BRAM and Registers
-    assign axi_rdata = (araddr[16] == 1'b0) ? bram_dout_a : reg_rdata;
+    assign axi_rdata = (araddr_reg[16] == 1'b0) ? bram_dout_a : reg_rdata;
 
 endmodule

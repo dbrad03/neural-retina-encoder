@@ -55,8 +55,12 @@ async def test_full_frame(dut):
     
     # UDP Transmitter
     import socket
-    udp_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    udp_target = ("127.0.0.1", 8080)
+    udp_sock = None
+    try:
+        udp_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        udp_target = ("127.0.0.1", 8080)
+    except Exception as e:
+        dut._log.warning(f"Could not create UDP socket: {e}")
 
     # Task to handle pixel input
     async def sensor_loop():
@@ -83,8 +87,9 @@ async def test_full_frame(dut):
                     addr = int(dut.spike_data.value) & 0x3FFF
                     # Transmit Spike: Type 1
                     packet = bytearray([1]) + addr.to_bytes(2, byteorder='big')
-                    udp_sock.sendto(packet, udp_target)
-                except ValueError:
+                    if udp_sock:
+                        udp_sock.sendto(packet, udp_target)
+                except Exception:
                     pass
                 
     cocotb.start_soon(spike_monitor())
@@ -97,7 +102,11 @@ async def test_full_frame(dut):
         
         # Transmit Stimulus Image: Type 2
         stim_packet = bytearray([2]) + current_frame.tobytes()
-        udp_sock.sendto(stim_packet, udp_target)
+        if udp_sock:
+            try:
+                udp_sock.sendto(stim_packet, udp_target)
+            except Exception:
+                pass
 
         # Trigger FPGA Frame
         dut.start_frame.value = 1

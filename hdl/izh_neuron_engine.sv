@@ -9,6 +9,9 @@ module izh_neuron_engine (
     input  storage_t     u_curr_s,
     input  storage_t     i_ext_s,
     
+    // Cell Type (1 = Midget, 0 = Parasol)
+    input  logic         is_midget,
+    
     // Control
     input  logic         start,
     output logic         done,
@@ -25,28 +28,38 @@ module izh_neuron_engine (
     assign u_in = s2c(u_curr_s);
     assign i_in = s2c(i_ext_s);
     
+    // Select parameters based on cell type
+    calc_t a_param, d_param;
+    assign a_param = is_midget ? IZH_A_MIDGET : IZH_A_PARASOL;
+    assign d_param = is_midget ? IZH_D_MIDGET : IZH_D_PARASOL;
+    
     // Pipeline Registers
     // Stage 1: Input Capture
     calc_t v_s1, u_s1, i_s1;
+    calc_t a_s1, d_s1;
     logic  s1_valid, s1_spike_reset;
 
     // Stage 2: Initial Multiplications
     calc_t v_s2, u_s2, i_s2;
+    calc_t a_s2, d_s2;
     calc_t v_sq, v_5, bv;
     logic  s2_valid, s2_spike_reset;
     
     // Stage 3: Secondary Multiplications and 1-adder Chains
     calc_t v_s3, u_s3;
+    calc_t a_s3, d_s3;
     calc_t v2_04, v_sum_part1, v_sum_part2, du_diff;
     logic  s3_valid, s3_spike_reset;
 
     // Stage 4: Tertiary Multiplications and 2-adder Chains
     calc_t v_s4, u_s4;
+    calc_t d_s4;
     calc_t dv_sum, du;
     logic  s4_valid, s4_spike_reset;
 
     // Stage 5: Integration Multiplications
     calc_t v_s5, u_s5;
+    calc_t d_s5;
     calc_t dv, du_dt;
     logic  s5_valid, s5_spike_reset;
 
@@ -56,12 +69,16 @@ module izh_neuron_engine (
             v_s1            <= '0;
             u_s1            <= '0;
             i_s1            <= '0;
+            a_s1            <= '0;
+            d_s1            <= '0;
             s1_valid        <= '0;
             s1_spike_reset  <= '0;
         end else if (start) begin
             v_s1            <= v_in;
             u_s1            <= u_in;
             i_s1            <= i_in;
+            a_s1            <= a_param;
+            d_s1            <= d_param;
             s1_valid        <= 1'b1;
             s1_spike_reset  <= (v_in >= V_THRESH);
         end else begin
@@ -75,6 +92,8 @@ module izh_neuron_engine (
             v_s2            <= '0;
             u_s2            <= '0;
             i_s2            <= '0;
+            a_s2            <= '0;
+            d_s2            <= '0;
             v_sq            <= '0;
             v_5             <= '0;
             bv              <= '0;
@@ -84,6 +103,8 @@ module izh_neuron_engine (
             v_s2            <= v_s1;
             u_s2            <= u_s1;
             i_s2            <= i_s1;
+            a_s2            <= a_s1;
+            d_s2            <= d_s1;
             
             // MULTIPLICATIONS ONLY
             v_sq            <= fp_mul(v_s1, v_s1);
@@ -102,6 +123,8 @@ module izh_neuron_engine (
         if (!rst_n) begin
             v_s3            <= '0;
             u_s3            <= '0;
+            a_s3            <= '0;
+            d_s3            <= '0;
             v2_04           <= '0;
             v_sum_part1     <= '0;
             v_sum_part2     <= '0;
@@ -111,6 +134,8 @@ module izh_neuron_engine (
         end else if (s2_valid) begin
             v_s3 <= v_s2;
             u_s3 <= u_s2;
+            a_s3 <= a_s2;
+            d_s3 <= d_s2;
             
             // MULTIPLICATIONS ONLY
             v2_04 <= fp_mul(IZH_0_04, v_sq);
@@ -132,6 +157,7 @@ module izh_neuron_engine (
         if (!rst_n) begin
             v_s4            <= '0;
             u_s4            <= '0;
+            d_s4            <= '0;
             dv_sum          <= '0;
             du              <= '0;
             s4_valid        <= '0;
@@ -139,9 +165,10 @@ module izh_neuron_engine (
         end else if (s3_valid) begin
             v_s4 <= v_s3;
             u_s4 <= u_s3;
+            d_s4 <= d_s3;
             
             // MULTIPLICATIONS ONLY
-            du <= fp_mul(IZH_A, du_diff);
+            du <= fp_mul(a_s3, du_diff);
             
             // 2-ADDER CHAIN: A + B + C
             dv_sum <= v2_04 + v_sum_part1 + v_sum_part2;
@@ -158,6 +185,7 @@ module izh_neuron_engine (
         if (!rst_n) begin
             v_s5            <= '0;
             u_s5            <= '0;
+            d_s5            <= '0;
             dv              <= '0;
             du_dt           <= '0;
             s5_valid        <= '0;
@@ -165,6 +193,7 @@ module izh_neuron_engine (
         end else if (s4_valid) begin
             v_s5 <= v_s4;
             u_s5 <= u_s4;
+            d_s5 <= d_s4;
             
             // MULTIPLICATIONS ONLY
             dv    <= fp_mul(dv_sum, IZH_DT);
@@ -187,7 +216,7 @@ module izh_neuron_engine (
         end else if (s5_valid) begin
             if (s5_spike_reset) begin
                 v_next_s <= c2s(IZH_C);
-                u_next_s <= c2s(u_s5 + IZH_D);
+                u_next_s <= c2s(u_s5 + d_s5);
                 spike    <= 1'b1;
             end else begin
                 v_next_s <= c2s(v_s5 + dv);

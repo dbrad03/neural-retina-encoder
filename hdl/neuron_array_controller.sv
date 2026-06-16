@@ -27,7 +27,9 @@ module neuron_array_controller #(
     
     // Debug/Status
     output logic [ADDR_WIDTH-1:0] dbg_wr_addr,
-    output logic                  dbg_we_state
+    output logic                  dbg_we_state,
+    output logic                  overflow_seen,
+    input  logic                  clear_overflow
 );
 
     // --- TYPES & ENUMS ---
@@ -46,8 +48,8 @@ module neuron_array_controller #(
     logic [ADDR_WIDTH:0]   fifo_count;
 
     // --- PIPELINE MANAGEMENT ---
-    logic [ADDR_WIDTH-1:0] scan_cnt;
-    logic [ADDR_WIDTH-1:0] done_cnt;
+    logic [ADDR_WIDTH:0] scan_cnt;
+    logic [ADDR_WIDTH:0] done_cnt;
     logic [ADDR_WIDTH-1:0] addr_pipe [7]; 
     logic                  start_pipe [7]; 
 
@@ -57,6 +59,40 @@ module neuron_array_controller #(
         for (int i = 1; i < 7; i++) begin
             addr_pipe[i] <= addr_pipe[i-1];
             start_pipe[i] <= start_pipe[i-1];
+        end
+    end
+    
+    // --- FOVEATION (Diamond Midget/Parasol Selection) ---
+    logic [6:0] x_coord, y_coord;
+    logic signed [7:0] dx, dy;
+    logic [6:0] abs_dx, abs_dy;
+    logic [7:0] dist_val;
+    logic is_midget_comb;
+    logic is_midget_pipe [7];
+
+    generate
+        if (ADDR_WIDTH >= 14) begin : gen_fovea_coords
+            assign x_coord = scan_cnt[6:0];
+            assign y_coord = scan_cnt[13:7];
+        end else begin : gen_fovea_fallback
+            assign x_coord = 7'd64; // Fallback for small tests
+            assign y_coord = 7'd64;
+        end
+    endgenerate
+
+    always_comb begin
+        dx = $signed({1'b0, x_coord}) - 8'sd64;
+        dy = $signed({1'b0, y_coord}) - 8'sd64;
+        abs_dx = (dx < 0) ? -dx : dx;
+        abs_dy = (dy < 0) ? -dy : dy;
+        dist_val = {1'b0, abs_dx} + {1'b0, abs_dy};
+        is_midget_comb = (dist_val < 8'd45);
+    end
+
+    always_ff @(posedge clk) begin
+        is_midget_pipe[0] <= is_midget_comb;
+        for (int i = 1; i < 7; i++) begin
+            is_midget_pipe[i] <= is_midget_pipe[i-1];
         end
     end
 
@@ -69,12 +105,14 @@ module neuron_array_controller #(
 
     izh_neuron_engine engine_inst (
         .clk(clk), .rst_n(rst_n), .v_curr_s(v_state_in), .u_curr_s(u_state_in), .i_ext_s(pixel_data), 
+        .is_midget(is_midget_pipe[0]),
         .start(start_pipe[0]), .done(engine_done), .v_next_s(v_state_out), .u_next_s(u_state_out), .spike(engine_spike)
     );
 
     spike_fifo #(.ADDR_WIDTH(ADDR_WIDTH), .FIFO_DEPTH(NUM_NEURONS)) fifo_inst (
         .clk(clk), .rst_n(rst_n), .din(fifo_din), .wr_en(fifo_wr), .full(fifo_full), 
-        .dout(fifo_dout), .rd_en(fifo_rd), .empty(fifo_empty), .count(fifo_count)
+        .dout(fifo_dout), .rd_en(fifo_rd), .empty(fifo_empty), .count(fifo_count),
+        .overflow_seen(overflow_seen), .clear_overflow(clear_overflow)
     );
 
     // --- WRITEBACK ALIGNMENT ---
@@ -148,17 +186,16 @@ module neuron_array_controller #(
     // --- FIFO DRAIN ---
     assign spike_data = {2'b00, fifo_dout};
 
+    assign fifo_rd = !fifo_empty && (!spike_valid || spike_ready);
+
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             spike_valid <= 1'b0;
-            fifo_rd     <= 1'b0;
         end else begin
-            if (!fifo_empty && spike_ready && !fifo_rd) begin
-                fifo_rd <= 1'b1; 
-            end else if (fifo_rd) begin
-                fifo_rd <= 1'b0;
+            // Valid data appears exactly 1 cycle after fifo_rd
+            if (fifo_rd) begin
                 spike_valid <= 1'b1;
-            end else if (spike_ready) begin
+            end else if (spike_ready && spike_valid) begin
                 spike_valid <= 1'b0;
             end
         end

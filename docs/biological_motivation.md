@@ -17,9 +17,9 @@ The human retina contains a variety of ganglion cells. We model two primary ones
    - Used for detecting quick movement in our peripheral vision.
    - Modeled via Izhikevich parameters: `a = 0.1, b = 0.2, c = -65.0, d = 2.0`.
 
-## Foveated Mapping (Planned)
-Our hardware architecture is being designed to support a spatial map matching this behavior:
-- The inner radii map entirely to **Midget cells**.
+## Foveated Mapping
+Our hardware architecture includes a spatial map matching this behavior:
+- The inner radii (`|x - 64| + |y - 64| < 45`) map entirely to **Midget cells**.
 - The outer rings map to **Parasol cells**.
 
-Currently, this heterogeneity is modeled conceptually and is planned for Phase 2 hardware integration. This heterogeneity will provide significant power and data-bandwidth advantages while rendering a closer-to-nature sensory experience for the end-user.
+This heterogeneity provides significant power and data-bandwidth advantages while rendering a closer-to-nature sensory experience for the end-user.

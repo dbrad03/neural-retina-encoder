@@ -10,10 +10,16 @@ package izh_pkg;
     localparam calc_t FP_ONE  = 32'sh00010000; // 1.0 << 16
     
     // Izhikevich Regular Spiking (Midget-like) parameters
-    localparam calc_t IZH_A = 32'sh0000051E; // 0.02 * 2^16 = 1310 (0x51E)
+    localparam calc_t IZH_A_MIDGET = 32'sh0000051E; // 0.02 * 2^16 = 1310 (0x51E)
+    localparam calc_t IZH_D_MIDGET = 32'sh00080000; // 8.0 * 2^16
+
+    // Izhikevich Fast Spiking (Parasol-like) parameters
+    localparam calc_t IZH_A_PARASOL = 32'sh0000199A; // 0.1 * 2^16 = 6554 (0x199A)
+    localparam calc_t IZH_D_PARASOL = 32'sh00020000; // 2.0 * 2^16
+
+    // Common Parameters
     localparam calc_t IZH_B = 32'sh00003333; // 0.2 * 2^16  = 13107 (0x3333)
     localparam calc_t IZH_C = -32'sh00410000; // -65 * 2^16
-    localparam calc_t IZH_D = 32'sh00080000; // 8 * 2^16
 
     // Thresholds
     localparam calc_t V_THRESH = 32'sh001E0000; // 30mV * 2^16

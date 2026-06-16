@@ -16,7 +16,9 @@ module spike_fifo #(
     output logic                  empty,
     
     // Status
-    output logic [ADDR_WIDTH:0]   count
+    output logic [ADDR_WIDTH:0]   count,
+    output logic                  overflow_seen,
+    input  logic                  clear_overflow
 );
     // Inferred BRAM FIFO
     logic [ADDR_WIDTH-1:0] mem [FIFO_DEPTH];
@@ -33,8 +35,12 @@ module spike_fifo #(
             wr_ptr <= '0;
             rd_ptr <= '0;
             internal_count <= '0;
+            overflow_seen <= '0;
         end else begin
-            if (wr_en && !full && rd_en && !empty) begin
+            if (clear_overflow) overflow_seen <= 1'b0;
+            else if (wr_en && full && !rd_en) overflow_seen <= 1'b1;
+            
+            if (wr_en && rd_en && !empty) begin
                 wr_ptr <= wr_ptr + 1;
                 rd_ptr <= rd_ptr + 1;
             end else if (wr_en && !full) begin
@@ -49,7 +55,7 @@ module spike_fifo #(
 
     // Memory read/write logic (synchronous, no async reset)
     always_ff @(posedge clk) begin
-        if (wr_en && !full) begin
+        if (wr_en && (!full || rd_en)) begin
             mem[wr_ptr] <= din;
         end
         if (rd_en && !empty) begin

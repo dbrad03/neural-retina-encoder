@@ -24,6 +24,8 @@ async def test_izh_integration(dut):
     cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
     
     # Reset
+    dut.start.value = 0
+    dut.is_midget.value = 1
     dut.rst_n.value = 0
     await RisingEdge(dut.clk)
     dut.rst_n.value = 1
