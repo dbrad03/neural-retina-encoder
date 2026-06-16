@@ -20,8 +20,8 @@ The human retina does not process light uniformly. The ganglion cells that trans
 - **Behavior:** These cells exhibit a *Chattering (CH)* or bursty response. When a stimulus appears, they fire a rapid burst of spikes and then quickly adapt, going quiet even if the stimulus remains. This makes them highly sensitive to changes (like a fast-moving object entering your peripheral vision) but terrible for sustained focus.
 - **Izhikevich Parameters:** `a = 0.1, b = 0.2, c = -65.0, d = 2.0`
 
-## 3. The Foveated Array Architecture
-To replicate this biological structure efficiently on an FPGA, we implemented a **Foveated Mapping** strategy across our 128x128 neuron array (16,384 total neurons).
+## 3. The Foveated Array Architecture (Planned)
+To replicate this biological structure efficiently on an FPGA, we are planning a **Foveated Mapping** strategy across our 128x128 neuron array (16,384 total neurons). Currently this is modeled conceptually and is scheduled for Phase 2 hardware integration.
 
 Instead of treating the array as a uniform grid, the FPGA's controller mathematically calculates the radius of each neuron from the center (64, 64). 
 - **Inner Radii (The Fovea):** Neurons within the central region are assigned the Midget cell parameters. This gives the "patient" clear, steady vision where they are focusing.

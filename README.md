@@ -4,11 +4,11 @@ A real-time hardware implementation of a foveated retinal ganglion cell encoder 
 
 ## Project Overview
 
-This project provides a complete end-to-end hardware-software system for simulating a retina. The engine receives "pixel" inputs and emits "spikes" that emulate the human eye's Midget (steady response) and Parasol (bursting response) ganglion cells. It takes advantage of a foveated structure, applying steady behavior in the visual center and bursty motion-detecting behavior in the periphery.
+This project provides a complete end-to-end hardware-software system for simulating a retina. The engine receives "pixel" inputs and emits "spikes" that emulate the human eye's Midget (steady response) and Parasol (bursting response) ganglion cells (hardware multiplexing is planned/model-level).
 
 ### Key Features
 - **Large-Scale Spiking Neural Network**: 16,384 Izhikevich neurons structured in a 128x128 grid.
-- **Foveated Architecture**: Biological realism achieved by mapping Midget cells to the fovea (center) and Parasol cells to the periphery.
+- **Foveated Architecture (Planned)**: Biological realism will be achieved by mapping Midget cells to the fovea (center) and Parasol cells to the periphery.
 - **Fixed-Point Pipeline**: Q8.10 arithmetic to minimize hardware usage without sacrificing biological fidelity (verified against float models).
 - **BCI Visualizer**: Real-time Rust-based visualizer for UDP stream visualization of the spiking network.
 
@@ -51,9 +51,9 @@ cargo run
 
 ## Status & Accomplishments
 
-This project is fully implemented and **Hardware-Verified**!
+This project is fully implemented and **Pre-silicon verified through RTL simulation, synthesis, and routed implementation.**
 - **100MHz Timing Closure:** Implemented a deeply-optimized 6-stage execution pipeline to hit 100MHz FMAX on a Zynq-7000 (Zybo Z7-20). A single pipelined neuron engine is time-multiplexed across 16,384 neuron states per frame; Vivado maps the datapath to 6 DSP48E1 slices.
 - **AXI-Lite & AXI-Stream Integration:** The hardware engine is wrapped in standard AMBA AXI interfaces. AXI-Lite is used for memory-mapped pixel stimulus and control, while AXI-Stream is used for the high-bandwidth 16-bit spike output.
 - **Zynq SoC Block Design:** A fully automated Vivado `build_bd.tcl` script is provided to generate the entire hardware system, connecting the PL (Programmable Logic) retina IP to the PS (Processing System) ARM cores.
 - **Software Driver:** Includes both a bare-metal Python driver and a high-performance **C++ OpenCV Driver** (`sw/c_driver/main.cpp`) that captures a live physical USB webcam feed, pushes it directly into the FPGA via `/dev/mem`, and streams the biological spikes over UDP.
-- **Complete Test Coverage:** Uses `cocotbext-axi` to simulate the full System-on-Chip data flows before synthesis.
+- **Verification Coverage:** Current Cocotb coverage includes engine and full-frame controller tests; AXI stress, interrupt, backpressure, and golden scoreboard tests are planned.

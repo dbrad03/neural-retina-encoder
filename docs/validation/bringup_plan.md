@@ -26,7 +26,11 @@ Once the Zybo Z7-20 board arrives, we will perform the following validation proc
 
 5. **Visual Validation:**
    - Launch the Rust `bci_visualizer`.
-   - Wave a hand in front of the camera and observe the localized bursting (Parasol) in the periphery and steady firing (Midget) in the fovea.
-   - **Artifact:** Video screen-recording of the visualizer reacting to live physical stimuli.
+   - Observe the real-time spiking network reacting to live physical stimuli.
+   - **Artifact:** Video screen-recording of the visualizer.
 
 *(Optional) If issues occur: Use a Vivado ILA (Integrated Logic Analyzer) over JTAG to capture `start_frame`, `frame_done_irq`, `m_axis_tvalid`, and FIFO status flags live on the board.*
+
+### Post-Phase 2 Foveation Bringup
+Once Phase 2 Foveated parameter selection is implemented in RTL:
+- Wave a hand in front of the camera and verify localized bursting (Parasol) in the periphery and steady firing (Midget) in the fovea.
