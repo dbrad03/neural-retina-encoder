@@ -23,9 +23,9 @@ The human retina does not process light uniformly. The ganglion cells that trans
 ## 3. The Foveated Array Architecture (Planned)
 To replicate this biological structure efficiently on an FPGA, we are planning a **Foveated Mapping** strategy across our 128x128 neuron array (16,384 total neurons). Currently this is modeled conceptually and is scheduled for Phase 2 hardware integration.
 
-Instead of treating the array as a uniform grid, the FPGA's controller mathematically calculates the radius of each neuron from the center (64, 64). 
-- **Inner Radii (The Fovea):** Neurons within the central region are assigned the Midget cell parameters. This gives the "patient" clear, steady vision where they are focusing.
-- **Outer Radii (The Periphery):** Neurons outside this central zone are assigned the Parasol cell parameters. 
+Instead of treating the array as a uniform grid, the FPGA's controller will mathematically calculate the radius of each neuron from the center (64, 64). 
+- **Inner Radii (The Fovea):** Neurons within the central region will be assigned the Midget cell parameters. This gives the "patient" clear, steady vision where they are focusing.
+- **Outer Radii (The Periphery):** Neurons outside this central zone will be assigned the Parasol cell parameters. 
 
 ### Why Foveated Mapping?
 1. **Biological Realism:** It closer matches how the human eye actually works, providing a more natural sensory experience that the brain knows how to decode.

@@ -1,10 +1,10 @@
-# Science Eye FPGA: 128x128 Foveated Izhikevich Encoder
+# Science Eye FPGA: 128x128 Izhikevich Retina Encoder
 
-A real-time hardware implementation of a foveated retinal ganglion cell encoder using the Izhikevich spiking neuron model, designed for the Science Eye visual prosthetic. It evaluates 16,384 neuron states sequentially/time-multiplexed within a 1ms biological timeframe on an FPGA.
+A real-time hardware implementation of a retinal ganglion cell encoder (with planned foveated extensions) using the Izhikevich spiking neuron model, designed for the Science Eye visual prosthetic. It evaluates 16,384 neuron states sequentially/time-multiplexed within a 1ms biological timeframe on an FPGA.
 
 ## Project Overview
 
-This project provides a complete end-to-end hardware-software system for simulating a retina. The engine receives "pixel" inputs and emits "spikes" that emulate the human eye's Midget (steady response) and Parasol (bursting response) ganglion cells (hardware multiplexing is planned/model-level).
+This project provides a complete end-to-end hardware-software system for simulating a retina. The engine receives "pixel" inputs and emits "spikes" that emulate the human eye's Midget (steady response) and Parasol (bursting response) ganglion cells (Midget/Parasol heterogeneity is currently model-level and planned for RTL integration).
 
 ### Key Features
 - **Large-Scale Spiking Neural Network**: 16,384 Izhikevich neurons structured in a 128x128 grid.
@@ -51,7 +51,7 @@ cargo run
 
 ## Status & Accomplishments
 
-This project is fully implemented and **Pre-silicon verified through RTL simulation, synthesis, and routed implementation.**
+The current uniform-parameter RTL path is implemented and **Pre-silicon verified through RTL simulation, synthesis, and routed implementation.**
 - **100MHz Timing Closure:** Implemented a deeply-optimized 6-stage execution pipeline to hit 100MHz FMAX on a Zynq-7000 (Zybo Z7-20). A single pipelined neuron engine is time-multiplexed across 16,384 neuron states per frame; Vivado maps the datapath to 6 DSP48E1 slices.
 - **AXI-Lite & AXI-Stream Integration:** The hardware engine is wrapped in standard AMBA AXI interfaces. AXI-Lite is used for memory-mapped pixel stimulus and control, while AXI-Stream is used for the high-bandwidth 16-bit spike output.
 - **Zynq SoC Block Design:** A fully automated Vivado `build_bd.tcl` script is provided to generate the entire hardware system, connecting the PL (Programmable Logic) retina IP to the PS (Processing System) ARM cores.
