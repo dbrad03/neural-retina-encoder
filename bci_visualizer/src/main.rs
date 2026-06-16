@@ -1,0 +1,166 @@
+use minifb::{Key, Window, WindowOptions};
+use crossbeam_channel::{unbounded, Receiver};
+use std::net::UdpSocket;
+use std::thread;
+use std::time::Duration;
+
+const GRID_SIZE: usize = 128;
+const WIN_WIDTH: usize = GRID_SIZE * 2;
+const WIN_HEIGHT: usize = GRID_SIZE * 2;
+
+// --- RUST CONCEPT: ENUMS ---
+// This is like a Verilog 'struct' but with a built-in 'type' field.
+// It allows us to pass different kinds of data through the same channel.
+enum VisualizerEvent {
+    Spike(usize),                 // A single 14-bit address
+    StimulusFrame(Vec<u8>),       // A full 128x128 greyscale frame
+}
+
+fn main() {
+    let (tx, rx) = unbounded::<VisualizerEvent>();
+
+    // --- NETWORK THREAD ---
+    thread::spawn(move || {
+        let socket = UdpSocket::bind("127.0.0.1:8080").expect("Could not bind UDP socket");
+        let mut buf = [0u8; 16385]; // Large enough for a header + full frame
+
+        loop {
+            if let Ok((amt, _src)) = socket.recv_from(&mut buf) {
+                match buf[0] {
+                    1 => { // Spike Packet: [1, Addr_High, Addr_Low]
+                        if amt >= 3 {
+                            let addr = ((buf[1] as usize) << 8) | (buf[2] as usize);
+                            let _ = tx.send(VisualizerEvent::Spike(addr));
+                        }
+                    }
+                    2 => { // Stimulus Packet: [2, Pixel0, Pixel1, ...]
+                        if amt >= 1 + (GRID_SIZE * GRID_SIZE) {
+                            let frame = buf[1..1 + (GRID_SIZE * GRID_SIZE)].to_vec();
+                            let _ = tx.send(VisualizerEvent::StimulusFrame(frame));
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+    });
+
+    // --- UI THREAD ---
+    let mut buffer: Vec<u32> = vec![0; WIN_WIDTH * WIN_HEIGHT];
+    let mut persistence_buffer: Vec<u32> = vec![0; GRID_SIZE * GRID_SIZE];
+    let mut stimulus_buffer: Vec<u8> = vec![0; GRID_SIZE * GRID_SIZE];
+    
+    let mut window = Window::new(
+        "Science Eye Quadrant Visualizer",
+        WIN_WIDTH,
+        WIN_HEIGHT,
+        WindowOptions {
+            scale: minifb::Scale::X2,
+            ..WindowOptions::default()
+        },
+    ).unwrap();
+
+    window.limit_update_rate(Some(Duration::from_micros(16600)));
+
+    while window.is_open() && !window.is_key_down(Key::Escape) {
+        
+        // 1. Decay the persistence buffer (Bottom-Left quadrant)
+        for pixel in persistence_buffer.iter_mut() {
+            let g = ((*pixel >> 8) & 0xFF).saturating_sub(10);
+            *pixel = g << 8;
+        }
+
+        // 2. Process new events from the Network
+        let mut instant_spikes: Vec<usize> = Vec::new();
+        for event in rx.try_iter() {
+            match event {
+                VisualizerEvent::Spike(addr) => {
+                    if addr < GRID_SIZE * GRID_SIZE {
+                        instant_spikes.push(addr);
+                        persistence_buffer[addr] = 0x00FF00; // Bright Green
+                    }
+                }
+                VisualizerEvent::StimulusFrame(frame) => {
+                    stimulus_buffer = frame;
+                }
+            }
+        }
+
+        // 3. Compose the Quadrants
+        for y in 0..WIN_HEIGHT {
+            for x in 0..WIN_WIDTH {
+                let quad_x = x / GRID_SIZE;
+                let quad_y = y / GRID_SIZE;
+                let local_x = x % GRID_SIZE;
+                let local_y = y % GRID_SIZE;
+                let idx = local_y * GRID_SIZE + local_x;
+                let out_idx = y * WIN_WIDTH + x;
+
+                // Draw a faint 16x16 grid to make the retinal array visible
+                let is_grid_line = local_x % 16 == 0 || local_y % 16 == 0;
+                let grid_color = 0x111111; // Very faint gray
+                
+                // Draw a biological eye/retina map outline
+                let dx = local_x as f32 - 64.0;
+                let dy = local_y as f32 - 64.0;
+                let dist = (dx * dx + dy * dy).sqrt();
+                // Outer Retina Edge
+                let is_retina_edge = dist > 59.0 && dist < 61.0;
+                // Inner Fovea/Pupil Edge
+                let is_fovea_edge = dist > 14.0 && dist < 16.0;
+                // Horizontal optic nerve line
+                let is_optic_nerve = (dy > -1.0 && dy < 1.0) && local_x > 64;
+                
+                let is_eye_drawing = is_retina_edge || is_fovea_edge || is_optic_nerve;
+                let eye_color = 0x555555; // Brighter gray for the eye outline
+
+                match (quad_x, quad_y) {
+                    (0, 0) => { // TOP-LEFT: Stimulus (Greyscale)
+                        let val = stimulus_buffer[idx];
+                        buffer[out_idx] = (val as u32) << 16 | (val as u32) << 8 | (val as u32);
+                    }
+                    (1, 0) => { // TOP-RIGHT: Instant Spikes (White)
+                        if instant_spikes.contains(&idx) {
+                            buffer[out_idx] = 0xFFFFFF;
+                        } else if is_eye_drawing {
+                            buffer[out_idx] = eye_color;
+                        } else if is_grid_line {
+                            buffer[out_idx] = grid_color;
+                        } else {
+                            buffer[out_idx] = 0;
+                        }
+                    }
+                    (0, 1) => { // BOTTOM-LEFT: Persistence (Green)
+                        let p = persistence_buffer[idx];
+                        if p > 0 {
+                            buffer[out_idx] = p;
+                        } else if is_eye_drawing {
+                            buffer[out_idx] = eye_color;
+                        } else if is_grid_line {
+                            buffer[out_idx] = grid_color;
+                        } else {
+                            buffer[out_idx] = 0;
+                        }
+                    }
+                    (1, 1) => { // BOTTOM-RIGHT: Composite View (Stimulus + Instant Spikes)
+                        let val = stimulus_buffer[idx] / 2;
+                        let base_bg = val as u32; // Dim blue background for stimulus
+                        
+                        if instant_spikes.contains(&idx) {
+                            buffer[out_idx] = 0xFFFFFF; // White flash
+                        } else if is_eye_drawing {
+                            buffer[out_idx] = eye_color | base_bg;
+                        } else if is_grid_line {
+                            buffer[out_idx] = grid_color | base_bg;
+                        } else {
+                            buffer[out_idx] = base_bg;
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+
+        window.update_with_buffer(&buffer, WIN_WIDTH, WIN_HEIGHT).unwrap();
+    }
+}

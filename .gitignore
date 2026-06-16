@@ -1,0 +1,23 @@
+# Vivado
+vivado/zynq_retina/zynq_retina.runs/
+vivado/zynq_retina/zynq_retina.gen/
+vivado/zynq_retina/zynq_retina.cache/
+vivado/zynq_retina/zynq_retina.sim/
+vivado/zynq_retina/zynq_retina.hw/
+vivado/zynq_retina/zynq_retina.ip_user_files/
+vivado/*.jou
+vivado/*.log
+vivado/*.str
+vivado/.Xil/
+
+# Python & Cocotb
+sim/__pycache__/
+sim/sim_build/
+sim/*.vcd
+.venv/
+
+# C++ Driver
+sw/c_driver/retina_driver
+
+# Rust
+bci_visualizer/target/

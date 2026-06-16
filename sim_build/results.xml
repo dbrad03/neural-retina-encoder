@@ -1,0 +1,8 @@
+<testsuites name="results">
+  <testsuite name="all" package="all">
+    <property name="random_seed" value="1781407617" />
+    <testcase name="test_full_frame" classname="test_retina_system" file="/home/darchb/Projects/science-eye-fpga/sim/test_retina_system.py" lineno="40" time="363.3867962360382" sim_time_ns="34094440.0" ratio_time="93824.1024526767">
+      <failure error_type="SimFailure" error_msg="Simulator shut down prematurely" />
+    </testcase>
+  </testsuite>
+</testsuites>

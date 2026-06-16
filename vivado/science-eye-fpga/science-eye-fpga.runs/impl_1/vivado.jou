@@ -1,0 +1,24 @@
+#-----------------------------------------------------------
+# Vivado v2025.1 (64-bit)
+# SW Build 6140274 on Wed May 21 22:58:25 MDT 2025
+# IP Build 6138677 on Thu May 22 03:10:11 MDT 2025
+# SharedData Build 6139179 on Tue May 20 17:58:58 MDT 2025
+# Start of session at: Mon Jun 15 15:51:15 2026
+# Process ID         : 284410
+# Current directory  : /home/darchb/Projects/science-eye-fpga/vivado/science-eye-fpga/science-eye-fpga.runs/impl_1
+# Command line       : vivado -log neuron_array_controller.vdi -applog -product Vivado -messageDb vivado.pb -mode batch -source neuron_array_controller.tcl -notrace
+# Log file           : /home/darchb/Projects/science-eye-fpga/vivado/science-eye-fpga/science-eye-fpga.runs/impl_1/neuron_array_controller.vdi
+# Journal file       : /home/darchb/Projects/science-eye-fpga/vivado/science-eye-fpga/science-eye-fpga.runs/impl_1/vivado.jou
+# Running On         : darchb
+# Platform           : Arch
+# Operating System   : Arch Linux
+# Processor Detail   : AMD Ryzen 9 4900HS with Radeon Graphics
+# CPU Frequency      : 2595.368 MHz
+# CPU Physical cores : 8
+# CPU Logical cores  : 16
+# Host memory        : 16143 MB
+# Swap memory        : 34359 MB
+# Total Virtual      : 50503 MB
+# Available Virtual  : 45977 MB
+#-----------------------------------------------------------
+source neuron_array_controller.tcl -notrace
