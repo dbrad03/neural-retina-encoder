@@ -42,7 +42,7 @@ We have several higher-level simulation scripts to analyze bottlenecks and stabi
    ```bash
    python sim_heterogeneity.py
    ```
-   This validates the visual benefit of using our mixed Midget/Parasol Foveated model against a uniform grid. *(Note: This is currently a Python/model-level simulation and does not yet represent RTL coverage until Phase 2 is implemented).*
+   This validates the visual benefit of using our mixed Midget/Parasol Foveated model against a uniform grid. *(Note: This demonstrates the model-level Python simulation; the underlying parameter multiplexing is also verified in RTL).*
    - Output: `heterogeneity_test_final.png`
 
 3. **Stability & Temporal Aliasing**:

@@ -31,6 +31,6 @@ Once the Zybo Z7-20 board arrives, we will perform the following validation proc
 
 *(Optional) If issues occur: Use a Vivado ILA (Integrated Logic Analyzer) over JTAG to capture `start_frame`, `frame_done_irq`, `m_axis_tvalid`, and FIFO status flags live on the board.*
 
-### Post-Phase 2 Foveation Bringup
-Once Phase 2 Foveated parameter selection is implemented in RTL:
+### Foveation Bringup
+With Foveated parameter selection implemented in RTL:
 - Wave a hand in front of the camera and verify localized bursting (Parasol) in the periphery and steady firing (Midget) in the fovea.
