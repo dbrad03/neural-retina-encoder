@@ -8,7 +8,7 @@ The core processing element is a deeply pipelined execution unit calculating the
 2. $u' = a(bv - u)$
 3. Spike conditions ($v \geq 30$) trigger voltage reset and recovery variable jumps.
 
-It uses fixed-point Q8.10 representation and a highly optimized **6-stage pipeline** to achieve maximal clock frequencies (100MHz+ on Zynq-7000). By carefully staggering the arithmetic across 6 clock cycles, it requires only **1 hardware multiplier per cycle**, drastically reducing DSP slice utilization and preventing routing congestion.
+It uses fixed-point Q8.10 representation and a highly optimized **6-stage pipeline** to achieve maximal clock frequencies (100MHz+ on Zynq-7000). A single pipelined neuron engine is time-multiplexed across 16,384 neuron states per frame; Vivado maps the datapath to 6 DSP48E1 slices.
 
 ## The Controller and BRAMs (`neuron_array_controller.sv` & `neuron_state_mem.sv`)
 Since instantiating 16,384 distinct multipliers would exceed the capacity of practically all target FPGAs, the controller leverages Time-Multiplexing.
