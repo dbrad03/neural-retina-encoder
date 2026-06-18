@@ -1,4 +1,22 @@
 # Vivado
+vivado/**/*.cache/
+vivado/**/*.hw/
+vivado/**/*.ip_user_files/
+vivado/**/*.runs/
+vivado/**/*.sim/
+vivado/**/*.srcs/
+vivado/**/*.gen/
+vivado/**/*.jou
+vivado/**/*.log
+vivado/**/*.str
+vivado/**/*.dcp
+vivado/**/*.pb
+vivado/**/*.rpx
+vivado/**/*.wdf
+vivado/**/*.wpc
+vivado/**/*.xpr
+vivado/**/*.xsa
+vivado/**/.Xil/
 vivado/zynq_retina/zynq_retina.runs/
 vivado/zynq_retina/zynq_retina.gen/
 vivado/zynq_retina/zynq_retina.cache/
@@ -13,7 +31,10 @@ vivado/.Xil/
 # Python & Cocotb
 sim/__pycache__/
 sim/sim_build/
+sim_build/
 sim/*.vcd
+sim/neuron_sim
+sim/fixed_point_compare
 .venv/
 
 # C++ Driver

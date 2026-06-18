@@ -22,7 +22,6 @@ This project provides a complete end-to-end hardware-software system for simulat
 - [System Architecture](docs/architecture.md): Hardware pipeline design and controller state machines.
 - [Biological Motivation](docs/biological_motivation.md): Details on Foveated modeling and Midget/Parasol cell traits.
 - [Simulation and Testing](docs/simulation_and_testing.md): Instructions on running simulations and verification results.
-- [Project Roadmap](docs/roadmap.md): Current progression of the project.
 - [Contributing Standard](docs/CONTRIBUTING.md): A standard policy for documenting-as-you-go.
 
 ## Getting Started
