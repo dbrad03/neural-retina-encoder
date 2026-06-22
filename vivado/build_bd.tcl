@@ -27,8 +27,11 @@ set_property -dict [list CONFIG.PCW_USE_FABRIC_INTERRUPT {1} CONFIG.PCW_IRQ_F2P_
 # 2. AXI-Stream FIFO
 set fifo_vlnv [lindex [get_ipdefs -filter {NAME == axi_fifo_mm_s}] 0]
 create_bd_cell -type ip -vlnv $fifo_vlnv axi_fifo_mm_s_0
-# Configure FIFO for RX only (PL to PS)
-set_property -dict [list CONFIG.C_USE_TX_DATA {0} CONFIG.C_USE_TX_CTRL {0} CONFIG.C_USE_RX_DATA {1}] [get_bd_cells axi_fifo_mm_s_0]
+# Configure FIFO for RX only (PL to PS).
+# C_RX_FIFO_DEPTH must hold a whole frame's spikes (worst case = NUM_NEURONS =
+# 16384) because the design emits one TLAST-delimited packet per frame; the data
+# stays uncommitted in the RX FIFO until that closing TLAST arrives.
+set_property -dict [list CONFIG.C_USE_TX_DATA {0} CONFIG.C_USE_TX_CTRL {0} CONFIG.C_USE_RX_DATA {1} CONFIG.C_RX_FIFO_DEPTH {16384}] [get_bd_cells axi_fifo_mm_s_0]
 
 # 3. Custom IP
 create_bd_cell -type module -reference axi_retina_wrapper_v axi_retina_wrapper_v_0

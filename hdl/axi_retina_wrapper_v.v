@@ -28,8 +28,9 @@ module axi_retina_wrapper_v (
     // M_AXIS
     output wire [15:0]  m_axis_tdata,
     output wire         m_axis_tvalid,
+    output wire         m_axis_tlast,
     input  wire         m_axis_tready,
-    
+
     // Interrupts
     output wire         frame_done_irq
 );
@@ -61,6 +62,7 @@ module axi_retina_wrapper_v (
         .s_axi_rready(s_axi_rready),
         .m_axis_tdata(m_axis_tdata),
         .m_axis_tvalid(m_axis_tvalid),
+        .m_axis_tlast(m_axis_tlast),
         .m_axis_tready(m_axis_tready),
         .frame_done_irq(frame_done_irq)
     );

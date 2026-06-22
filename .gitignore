@@ -42,3 +42,21 @@ sw/c_driver/retina_driver
 
 # Rust
 bci_visualizer/target/
+
+# V4L2 driver binary
+sw/v4l2_driver/retina_v4l2
+
+# Deployment overlay artifacts (regenerable from vivado/build_bd.tcl)
+deploy/*.bit
+deploy/*.hwh
+
+# Python bytecode (anywhere)
+__pycache__/
+*.pyc
+
+# Vivado sweep/scratch outputs
+vivado/clockInfo.txt
+vivado/sweep_results/
+
+# Internal handoff doc (kept local, not for public portfolio)
+PORTFOLIO_HANDOFF.md

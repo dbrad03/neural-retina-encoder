@@ -48,10 +48,19 @@ cd bci_visualizer
 cargo run
 ```
 
+## Hardware Bringup
+
+Physical bring-up on the Zybo Z7-20 is driven from [`deploy/README.md`](deploy/README.md),
+a step-by-step runbook (PYNQ overlay → file-fed first light → UIO interrupts →
+live V4L2 camera). Supporting software for bring-up lives in `sw/`:
+- [`sw/first_light.py`](sw/first_light.py): file-fed, polling first-light test (no camera).
+- [`sw/v4l2_driver/`](sw/v4l2_driver/): live USB-camera driver via raw V4L2 (no OpenCV dependency).
+- [`sw/uio_retina.dts`](sw/uio_retina.dts): device-tree overlay exposing `frame_done_irq` as UIO.
+
 ## Status & Accomplishments
 
 The full RTL architecture is implemented and **Pre-silicon verified through RTL simulation.**
-- **100MHz Timing Closure:** Implemented a deeply-optimized 6-stage execution pipeline to hit 100MHz FMAX on a Zynq-7000 (Zybo Z7-20). A single pipelined neuron engine is time-multiplexed across 16,384 neuron states per frame; Vivado maps the datapath to 6 DSP48E1 slices *(Note: numbers reflect last routed implementation before Phase 2 RTL changes)*.
+- **100MHz Timing Closure:** Implemented a deeply-optimized 6-stage execution pipeline that meets 100MHz on a Zynq-7000 (Zybo Z7-20). A single pipelined neuron engine is time-multiplexed across 16,384 neuron states per frame; Vivado maps the datapath to 10 DSP48E1 slices. The post-Phase-2 full-system implementation (Vivado 2025.1) routes with **WNS +0.533 ns at 100MHz** (1,886 LUT / 1,838 FF / 42 BRAM / 10 DSP), and closure holds across a 10-directive placement sweep *(pre-silicon implementation result; physical board validation pending)*.
 - **AXI-Lite & AXI-Stream Integration:** The hardware engine is wrapped in standard AMBA AXI interfaces. AXI-Lite is used for memory-mapped pixel stimulus and control, while AXI-Stream is used for the high-bandwidth 16-bit spike output.
 - **Zynq SoC Block Design:** A fully automated Vivado `build_bd.tcl` script is provided to generate the entire hardware system, connecting the PL (Programmable Logic) retina IP to the PS (Processing System) ARM cores.
 - **Software Driver:** Includes both a bare-metal Python driver and a high-performance **C++ OpenCV Driver** (`sw/c_driver/main.cpp`) that captures a live physical USB webcam feed, pushes it directly into the FPGA via `/dev/mem`, and streams the biological spikes over UDP.

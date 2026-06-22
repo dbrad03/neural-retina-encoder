@@ -19,6 +19,7 @@ module neuron_array_controller #(
     output logic [15:0]  spike_data,
     output logic         spike_valid,
     input  logic         spike_ready,
+    output logic         spike_last,
     output logic         spike,
     
     // Output state
@@ -50,6 +51,7 @@ module neuron_array_controller #(
     // --- PIPELINE MANAGEMENT ---
     logic [ADDR_WIDTH:0] scan_cnt;
     logic [ADDR_WIDTH:0] done_cnt;
+    logic                frame_complete;  // set after scan done; gates spike drain
     logic [ADDR_WIDTH-1:0] addr_pipe [7]; 
     logic                  start_pipe [7]; 
 
@@ -184,9 +186,13 @@ module neuron_array_controller #(
     end
 
     // --- FIFO DRAIN ---
+    // Drain is GATED on frame_complete: spikes accumulate in the internal FIFO
+    // during the scan and only stream out as one burst after the frame finishes.
+    // This guarantees a genuine final beat exists to carry TLAST (otherwise the
+    // FIFO empties mid-scan and no beat is left to mark the packet end).
     assign spike_data = {2'b00, fifo_dout};
 
-    assign fifo_rd = !fifo_empty && (!spike_valid || spike_ready);
+    assign fifo_rd = frame_complete && !fifo_empty && (!spike_valid || spike_ready);
 
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
@@ -200,5 +206,18 @@ module neuron_array_controller #(
             end
         end
     end
+
+    // --- TLAST GENERATION (packet boundary = one packet per frame) ---
+    // frame_complete latches once the scan has finished (frame_done), so no
+    // more spikes will be enqueued. The current valid beat is the frame's last
+    // spike when the internal FIFO has drained empty behind it. This single
+    // TLAST lets the downstream axi_fifo_mm_s commit the frame as one packet.
+    always_ff @(posedge clk or negedge rst_n) begin
+        if (!rst_n)            frame_complete <= 1'b0;
+        else if (start_frame)  frame_complete <= 1'b0;  // new frame: re-arm
+        else if (frame_done)   frame_complete <= 1'b1;  // scan finished
+    end
+
+    assign spike_last = spike_valid && fifo_empty && frame_complete;
 
 endmodule

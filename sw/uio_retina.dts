@@ -1,0 +1,47 @@
+/*
+ * uio_retina.dts - Phase 4 device-tree overlay exposing the retina
+ * frame_done_irq as a UIO device (/dev/uioN) for interrupt-driven operation.
+ *
+ * Interrupt routing (from vivado/build_bd.tcl):
+ *   axi_retina_wrapper.frame_done_irq -> xlconcat In1 -> PS IRQ_F2P[1]
+ *   Zynq-7000: IRQ_F2P[1] = GIC ID 62 = device-tree SPI <0 30 4>
+ *   (IRQ_F2P[0], the FIFO IRQ, would be GIC 61 = <0 29 4>.)
+ *   Type 4 = IRQ_TYPE_LEVEL_HIGH; frame_done_reg is a latched level, cleared by
+ *   writing CTRL bit1 (0x2) to the control register at 0x40010000.
+ *
+ * The reg region points at the retina control page so uio_pdrv_genirq has a
+ * memory resource (required by that driver). The userspace driver still uses
+ * /dev/mem for register access and only read()s the UIO node to block on the IRQ.
+ *
+ * Build:   dtc -@ -I dts -O dtb -o uio_retina.dtbo uio_retina.dts
+ * Load on PYNQ: ship alongside the overlay (retina.bit/.hwh/.dtbo) so
+ *   Overlay('retina.bit') applies it, OR apply manually via configfs:
+ *     mkdir /sys/kernel/config/device-tree/overlays/retina
+ *     cat uio_retina.dtbo > .../retina/dtbo
+ *
+ * VERIFY ON HARDWARE:
+ *   1. The kernel needs uio_pdrv_genirq bound to compatible "generic-uio"
+ *      (boot arg: uio_pdrv_genirq.of_id=generic-uio, or already built in).
+ *   2. /dev/uio0 index is probe-order dependent. Confirm which node is ours:
+ *        for d in /sys/class/uio/uio*; do echo $d $(cat $d/name); done
+ *      and point the driver / open() at the matching uioN.
+ *   3. Confirm the SPI number (30) matches; if the IRQ never fires, try the
+ *      other concat ordering or check the .hwh interrupt map.
+ */
+/dts-v1/;
+/plugin/;
+
+/ {
+    fragment@0 {
+        target = <&amba>;
+        __overlay__ {
+            retina_uio: retina_uio@40010000 {
+                compatible = "generic-uio";
+                reg = <0x40010000 0x1000>;
+                interrupt-parent = <&intc>;
+                interrupts = <0 30 4>;
+                status = "okay";
+            };
+        };
+    };
+};

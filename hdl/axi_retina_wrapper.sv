@@ -34,8 +34,9 @@ module axi_retina_wrapper #(
     // M_AXIS (AXI4-Stream Master)
     output logic [15:0]  m_axis_tdata,
     output logic         m_axis_tvalid,
+    output logic         m_axis_tlast,
     input  logic         m_axis_tready,
-    
+
     // Interrupts
     output logic         frame_done_irq
 );
@@ -109,6 +110,7 @@ module axi_retina_wrapper #(
         .spike_data(m_axis_tdata),
         .spike_valid(m_axis_tvalid),
         .spike_ready(m_axis_tready),
+        .spike_last(m_axis_tlast),
         .spike(),       // Raw 1-bit spike output unused here
         .v_next_s(),
         .u_next_s(),
