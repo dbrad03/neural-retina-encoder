@@ -8,7 +8,8 @@ module neuron_array_controller #(
     input  logic         rst_n,
     
     // System Control
-    input  logic         start_frame, 
+    input  logic         start_frame,
+    output logic         busy,         // high from accepted start through end-of-drain
     output logic         frame_done,
     
     // Pixel Input
@@ -52,6 +53,12 @@ module neuron_array_controller #(
     logic [ADDR_WIDTH:0] scan_cnt;
     logic [ADDR_WIDTH:0] done_cnt;
     logic                frame_complete;  // set after scan done; gates spike drain
+    logic                frame_active;    // a frame is in progress (scanning or draining)
+    // A frame is fully done only once the scan finished AND the spike packet has
+    // drained out (FIFO empty and no beat in flight). A zero-spike frame clears
+    // immediately after frame_done.
+    wire                 drain_done = frame_complete && fifo_empty && !spike_valid;
+    assign busy = frame_active;
     logic [ADDR_WIDTH-1:0] addr_pipe [7]; 
     logic                  start_pipe [7]; 
 
@@ -216,6 +223,17 @@ module neuron_array_controller #(
         if (!rst_n)            frame_complete <= 1'b0;
         else if (start_frame)  frame_complete <= 1'b0;  // new frame: re-arm
         else if (frame_done)   frame_complete <= 1'b1;  // scan finished
+    end
+
+    // busy: high from a start through end-of-drain. This is an OBSERVABILITY
+    // signal (status bit7) -- starts are NOT gated on it, since the design
+    // intentionally allows back-to-back frames. Software should poll !busy before
+    // the next start to avoid clearing frame_complete mid-drain (which would cut
+    // the in-flight packet's TLAST).
+    always_ff @(posedge clk or negedge rst_n) begin
+        if (!rst_n)            frame_active <= 1'b0;
+        else if (start_frame)  frame_active <= 1'b1;
+        else if (drain_done)   frame_active <= 1'b0;
     end
 
     assign spike_last = spike_valid && fifo_empty && frame_complete;

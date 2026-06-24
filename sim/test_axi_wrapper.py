@@ -37,16 +37,25 @@ async def test_axi_operations(dut):
 
     # Write multiple times to charge up the neuron so it spikes
     for f in range(100):
+        # Wait until the controller is no longer busy (status bit7) before
+        # starting; starting while a prior frame is still draining would cut the
+        # in-flight packet's TLAST (the documented software contract).
+        while True:
+            status = int.from_bytes((await axil_master.read(0x10000, 4)).data, "little")
+            if not (status & 0x80):
+                break
+            await Timer(5, unit="us")
+
         # Trigger start_frame at offset 0x10000 (Bit 0) and clear frame_done (Bit 1)
         await axil_master.write(0x10000, b"\x03\x00\x00\x00")
-        
+
         # Poll frame_done (Bit 1)
         frame_done = False
         while not frame_done:
             status_bytes = await axil_master.read(0x10000, 4)
             status = int.from_bytes(status_bytes.data, "little")
             frame_done = (status & 0x2) != 0
-            await Timer(5, unit="us") 
+            await Timer(5, unit="us")
             
     dut._log.info("Frames processed successfully!")
     

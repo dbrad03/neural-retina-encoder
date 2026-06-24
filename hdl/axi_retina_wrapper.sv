@@ -56,15 +56,18 @@ module axi_retina_wrapper #(
     //-----------------------------------------
     // BRAM for Pixels
     //-----------------------------------------
-    (* ram_style = "block" *) logic [31:0] pixel_ram [0:NUM_NEURONS-1];
-    
+    // Sized to the full ADDR_WIDTH space (= NUM_NEURONS in the production
+    // 16384/ADDR_WIDTH=14 config) so the address width and array depth always
+    // agree, even for small parameterized regression builds.
+    (* ram_style = "block" *) logic [31:0] pixel_ram [0:(1<<ADDR_WIDTH)-1];
+
     logic        bram_en_a;
     logic [3:0]  bram_we_a;
-    logic [13:0] bram_addr_a;
+    logic [ADDR_WIDTH-1:0] bram_addr_a;
     logic [31:0] bram_din_a;
     logic [31:0] bram_dout_a;
-    
-    logic [13:0] pixel_addr_b;
+
+    logic [ADDR_WIDTH-1:0] pixel_addr_b;
     storage_t    pixel_data_b;
     logic [31:0] bram_dout_b;
 
@@ -148,6 +151,7 @@ module axi_retina_wrapper #(
 
     logic overflow_seen_wire;
     logic clear_overflow_reg;
+    logic busy_wire;   // controller is scanning or still draining a spike packet
 
     //-----------------------------------------
     // Controller Instance
@@ -159,6 +163,7 @@ module axi_retina_wrapper #(
         .clk(aclk),
         .rst_n(aresetn),
         .start_frame(start_frame_pulse),
+        .busy(busy_wire),
         .frame_done(frame_done_wire),
         .pixel_addr(pixel_addr_b),
         .pixel_data(pixel_data_b),
@@ -319,27 +324,38 @@ module axi_retina_wrapper #(
     assign bram_we_a   = dma_pix_we   ? 4'hF :
                          (axil_bram_wr ? wstrb_reg : 4'd0);
     assign bram_addr_a = dma_pix_we   ? dma_pix_addr :
-                         (axil_bram_wr ? awaddr_reg[15:2] : araddr_reg[15:2]);
+                         (axil_bram_wr ? awaddr_reg[ADDR_WIDTH+1:2]
+                                       : araddr_reg[ADDR_WIDTH+1:2]);
     assign bram_din_a  = dma_pix_we   ? dma_pix_data : wdata_reg;
 
-    // Latch the DMA ingress status pulses for software to poll.
+    // A DMA beat coinciding with an AXI-Lite BRAM access silently wins the shared
+    // port (the AXI-Lite side still gets an OKAY response). The two paths are not
+    // meant to be used concurrently; this records that it happened so software can
+    // detect the misuse instead of getting silently wrong data.
+    logic dma_axil_collision_l;
+    wire  dma_axil_collision = dma_pix_we && (axil_bram_wr || axil_bram_rd);
+
+    // Latch the DMA ingress status pulses (and the collision flag) for software.
     always_ff @(posedge aclk or negedge aresetn) begin
         if (!aresetn) begin
-            dma_loaded_l    <= 1'b0;
-            dma_err_short_l <= 1'b0;
-            dma_err_long_l  <= 1'b0;
+            dma_loaded_l         <= 1'b0;
+            dma_err_short_l      <= 1'b0;
+            dma_err_long_l       <= 1'b0;
+            dma_axil_collision_l <= 1'b0;
         end else begin
             // Clear on the control write that clears frame_done (wdata bit1).
             if (slv_reg_wren && awaddr_reg[16] && (awaddr_reg[15:0] == 16'h0000)
                 && wstrb_reg[0] && wdata_reg[1]) begin
-                dma_loaded_l    <= 1'b0;
-                dma_err_short_l <= 1'b0;
-                dma_err_long_l  <= 1'b0;
+                dma_loaded_l         <= 1'b0;
+                dma_err_short_l      <= 1'b0;
+                dma_err_long_l       <= 1'b0;
+                dma_axil_collision_l <= 1'b0;
             end
             // Set takes priority over the same-cycle clear.
-            if (dma_frame_loaded) dma_loaded_l    <= 1'b1;
-            if (dma_err_short)    dma_err_short_l <= 1'b1;
-            if (dma_err_long)     dma_err_long_l  <= 1'b1;
+            if (dma_frame_loaded)    dma_loaded_l         <= 1'b1;
+            if (dma_err_short)       dma_err_short_l      <= 1'b1;
+            if (dma_err_long)        dma_err_long_l       <= 1'b1;
+            if (dma_axil_collision)  dma_axil_collision_l <= 1'b1;
         end
     end
 
@@ -351,8 +367,10 @@ module axi_retina_wrapper #(
             if (slv_reg_rden) begin
                 if (araddr_reg[16] == 1'b1 && araddr_reg[15:0] == 16'h0000)
                     // bit0 start, bit1 frame_done, bit2 overflow,
-                    // bit3 dma_frame_loaded, bit4 dma_err_short, bit5 dma_err_long
-                    reg_rdata <= {26'd0, dma_err_long_l, dma_err_short_l, dma_loaded_l,
+                    // bit3 dma_frame_loaded, bit4 dma_err_short, bit5 dma_err_long,
+                    // bit6 dma_axil_collision, bit7 busy (scanning or draining)
+                    reg_rdata <= {24'd0, busy_wire, dma_axil_collision_l,
+                                  dma_err_long_l, dma_err_short_l, dma_loaded_l,
                                   overflow_seen_wire, frame_done_reg, start_frame_reg};
                 else
                     reg_rdata <= 32'd0;

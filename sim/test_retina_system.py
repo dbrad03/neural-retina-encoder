@@ -122,14 +122,15 @@ async def test_full_frame(dut):
             dut._log.info(f"Frame {f} rendered.")
         
         # With one TLAST-delimited packet per frame, spikes drain after
-        # frame_done. Do not start the next frame until the packet has fully
-        # streamed; otherwise frame_complete is cleared before TLAST commits.
+        # frame_done. Wait for the controller to deassert `busy` (scan finished
+        # AND packet drained) before the next start; starting while busy would
+        # clear the drain gate and cut the in-flight packet's TLAST.
         for _ in range(20000):
             await RisingEdge(dut.clk)
-            if dut.fifo_empty.value == 1 and dut.spike_valid.value == 0:
+            if dut.busy.value == 0:
                 break
         else:
-            raise AssertionError("Timed out waiting for post-frame spike drain")
+            raise AssertionError("Timed out waiting for drain (busy)")
 
     dut._log.info("Visualizer Demo Complete.")
 

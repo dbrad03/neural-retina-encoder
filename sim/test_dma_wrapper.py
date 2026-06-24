@@ -21,8 +21,12 @@ N = 16  # NUM_NEURONS for this build (small for speed)
 
 OFF_PIXEL_RAM = 0x00000
 OFF_CONTROL = 0x10000
+CTRL_START = 0x1
 CTRL_CLEAR_DONE = 0x2
-STAT_DMA_LOADED = 0x8  # status reg bit3
+STAT_DONE = 0x2
+STAT_DMA_LOADED = 0x8   # status reg bit3
+STAT_COLLISION = 0x40   # status reg bit6 (DMA vs AXI-Lite BRAM collision)
+STAT_BUSY = 0x80        # status reg bit7 (scanning or draining)
 
 
 @cocotb.test()
@@ -78,6 +82,74 @@ async def test_axilite_write_still_works(dut):
     rb = int.from_bytes((await axil.read(OFF_PIXEL_RAM + 4 * 3, 4)).data, "little")
     assert rb == val, f"AXI-Lite write/read broken by DMA mux: wrote {val:#x}, read {rb:#x}"
     dut._log.info("Legacy AXI-Lite pixel write/read PASSED with DMA enabled")
+
+
+@cocotb.test()
+async def test_dma_axil_collision_flagged(dut):
+    """A DMA beat coinciding with an AXI-Lite BRAM write sets the collision bit."""
+    cocotb.start_soon(Clock(dut.aclk, 10, unit="ns").start())
+    dut.aresetn.value = 0
+    dut.s_axis_pixel_tvalid.value = 0
+    dut.s_axis_pixel_tdata.value = 0
+    dut.s_axis_pixel_tlast.value = 0
+    await Timer(50, unit="ns")
+    dut.aresetn.value = 1
+    await RisingEdge(dut.aclk)
+
+    axil = AxiLiteMaster(AxiLiteBus.from_prefix(dut, "s_axi"), dut.aclk, dut.aresetn,
+                         reset_active_level=False)
+
+    # Hold the DMA stream valid (dma_pix_we high every cycle) while issuing an
+    # AXI-Lite BRAM write -- the write's BRAM cycle collides with a DMA beat.
+    dut.s_axis_pixel_tdata.value = 0x000ABCDE
+    dut.s_axis_pixel_tvalid.value = 1
+    await RisingEdge(dut.aclk)
+    await axil.write(OFF_PIXEL_RAM + 4 * 2, (0x00001111).to_bytes(4, "little"))
+    dut.s_axis_pixel_tvalid.value = 0
+    for _ in range(4):
+        await RisingEdge(dut.aclk)
+
+    status = int.from_bytes((await axil.read(OFF_CONTROL, 4)).data, "little")
+    assert status & STAT_COLLISION, f"collision bit not set; status={status:#x}"
+    dut._log.info("DMA/AXI-Lite collision correctly flagged")
+
+
+@cocotb.test()
+async def test_busy_status_and_drain(dut):
+    """busy (bit7) asserts during a frame and clears after the packet drains
+    (the status bit software polls before issuing the next start)."""
+    cocotb.start_soon(Clock(dut.aclk, 10, unit="ns").start())
+    dut.aresetn.value = 0
+    dut.s_axis_pixel_tvalid.value = 0
+    dut.s_axis_pixel_tdata.value = 0
+    dut.s_axis_pixel_tlast.value = 0
+    await Timer(50, unit="ns")
+    dut.aresetn.value = 1
+    await RisingEdge(dut.aclk)
+
+    axil = AxiLiteMaster(AxiLiteBus.from_prefix(dut, "s_axi"), dut.aclk, dut.aresetn,
+                         reset_active_level=False)
+
+    await axil.write(OFF_CONTROL, (CTRL_START | CTRL_CLEAR_DONE).to_bytes(4, "little"))
+
+    # Sample busy each cycle (peek the internal wire) to catch the short window.
+    saw_busy = False
+    cleared = False
+    for _ in range(3000):
+        await RisingEdge(dut.aclk)
+        b = int(dut.busy_wire.value)
+        if b:
+            saw_busy = True
+        elif saw_busy:
+            cleared = True
+            break
+    assert saw_busy, "busy never asserted during the frame"
+    assert cleared, "busy never cleared after the frame drained"
+
+    status = int.from_bytes((await axil.read(OFF_CONTROL, 4)).data, "little")
+    assert status & STAT_DONE, f"frame_done not set after busy cleared; status={status:#x}"
+    assert not (status & STAT_BUSY), "busy bit still set in status after drain"
+    dut._log.info("busy asserts/clears correctly and frame completed")
 
 
 def runner():
