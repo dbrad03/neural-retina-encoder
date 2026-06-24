@@ -1,5 +1,7 @@
 # Science Eye FPGA: Foveated 128x128 Izhikevich Retina Encoder
 
+[![CI](https://github.com/dbrad03/neural-retina-encoder/actions/workflows/ci.yml/badge.svg)](https://github.com/dbrad03/neural-retina-encoder/actions/workflows/ci.yml)
+
 A real-time hardware implementation of a foveated retinal ganglion cell encoder using the Izhikevich spiking neuron model, designed for the Science Eye visual prosthetic. It evaluates 16,384 neuron states sequentially/time-multiplexed within a 1ms biological timeframe on an FPGA.
 
 ## Project Overview
