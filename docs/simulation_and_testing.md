@@ -28,7 +28,7 @@ We use Cocotb and Icarus Verilog to validate the SystemVerilog HDL against our b
    *Claim: Process all 16,384 neurons and streams out valid spikes under dynamic stimuli.*
    **Status: Re-verified and Passing.** Full 128x128 frame integration logic works cleanly, buffering spikes efficiently.
 
-The full `make verify` target runs eleven Cocotb tests: engine, golden model, pipeline, spike FIFO, backpressure/overflow, interrupt logic, foveation zones, AXI-Lite stress, full retina integration, the DMA pixel-ingress AXI-Stream adapter, and the DMA-enabled wrapper integration test. Latest local run: 2026-06-23, all eleven tests passed.
+The full `make verify` target runs twelve Cocotb tests: engine, golden model, pipeline, spike FIFO, backpressure/overflow, interrupt logic, foveation zones, AXI-Lite stress, full retina integration, the DMA pixel-ingress AXI-Stream adapter, the DMA-enabled wrapper integration test, and a float-vs-RTL accuracy scoreboard. Latest local run: 2026-06-24, all twelve tests passed.
 
 ### System Verification Scripts
 We have several higher-level simulation scripts to analyze bottlenecks and stability limits of the system.

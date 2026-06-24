@@ -25,4 +25,6 @@ verify:
 	python test_pixel_ingress.py && python check_results.py && \
 	echo "--- 11. Testing DMA Wrapper Integration (AXI-Stream -> BRAM) ---" && \
 	python test_dma_wrapper.py && python check_results.py && \
+	echo "--- 12. Testing Float-vs-RTL Accuracy Scoreboard ---" && \
+	python test_float_scoreboard.py && python check_results.py && \
 	echo "All tests passed successfully!"

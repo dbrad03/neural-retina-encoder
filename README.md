@@ -11,7 +11,7 @@ This project provides an end-to-end hardware-software retina encoder. The engine
 ### Key Features
 - **Large-Scale Spiking Neural Network**: 16,384 Izhikevich neurons structured in a 128x128 grid.
 - **Foveated Architecture**: Biologically *inspired* structure — Midget-type (regular-spiking) dynamics are mapped to the fovea (center) and Parasol-type (adapting) dynamics to the periphery.
-- **Fixed-Point Pipeline**: Q8.10 arithmetic to minimize hardware usage. The RTL is verified **bit-exact against a fixed-point golden model** (`sim/test_golden.py`); the fixed-point error versus a floating-point reference is characterized separately, offline, in `sim/fixed_point_compare.cpp`.
+- **Fixed-Point Pipeline**: Q8.10 arithmetic to minimize hardware usage. The RTL is verified **bit-exact against a fixed-point golden model** (`sim/test_golden.py`) and **accuracy-checked against an independent floating-point reference** in the regression (`sim/test_float_scoreboard.py`): per-step membrane error stays under ~0.005 mV (limit 0.2 mV), with matching spike rate.
 - **BCI Visualizer**: Real-time Rust-based visualizer for UDP stream visualization of the spiking network.
 
 ## Directory Structure
@@ -35,7 +35,7 @@ This project provides an end-to-end hardware-software retina encoder. The engine
 - Rust and Cargo
 
 ### Running Tests
-The RTL regression is implemented with Python/Cocotb and Icarus Verilog. The current regression target is eleven tests covering the neuron engine, fixed-point scoreboard, pipeline alignment, FIFO behavior, AXI backpressure, interrupts, foveation boundaries, AXI-Lite stress, full-system integration, the DMA pixel-ingress AXI-Stream adapter, and the DMA-enabled wrapper integration.
+The RTL regression is implemented with Python/Cocotb and Icarus Verilog. The current regression target is twelve tests covering the neuron engine, fixed-point scoreboard, pipeline alignment, FIFO behavior, AXI backpressure, interrupts, foveation boundaries, AXI-Lite stress, full-system integration, the DMA pixel-ingress AXI-Stream adapter, the DMA-enabled wrapper integration, and a float-vs-RTL accuracy scoreboard.
 
 ```bash
 cd sim

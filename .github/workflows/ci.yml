@@ -59,3 +59,25 @@ jobs:
 
       - name: Compile-check V4L2 driver
         run: gcc -Wall -Wextra -std=c11 -c sw/v4l2_driver/retina_v4l2.c -o /tmp/retina_v4l2.o
+
+  lint:
+    name: Verilator lint (report)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Verilator
+        run: sudo apt-get update && sudo apt-get install -y verilator
+
+      # Report mode: -Wno-fatal surfaces warnings in the log without failing the
+      # build (style-only classes suppressed). Tighten to gating once the RTL is
+      # warning-clean.
+      - name: Lint RTL
+        run: |
+          verilator --lint-only -Wall -sv -Wno-fatal \
+            -Wno-DECLFILENAME -Wno-UNUSEDSIGNAL -Wno-UNUSEDPARAM \
+            -Wno-PINCONNECTEMPTY -Wno-VARHIDDEN \
+            hdl/izh_pkg.sv hdl/izh_neuron_engine.sv hdl/neuron_state_mem.sv \
+            hdl/spike_fifo.sv hdl/axis_pixel_ingress.sv \
+            hdl/neuron_array_controller.sv hdl/axi_retina_wrapper.sv \
+            --top-module axi_retina_wrapper

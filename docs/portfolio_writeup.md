@@ -44,8 +44,8 @@ The live demonstration path has been heavily optimized for lean, embedded execut
 
 ### 1. RTL Functional Verification
 *   **Regression Suite:** Cocotb/Python simulation verifies the neuron datapath, the AXI interfaces, and full-array integration on Icarus Verilog.
-*   **Coverage:** 11 test modules verify core math, golden scoreboard comparisons, pipeline stage alignments, FIFO depth/overflow bounds, AXI-Lite write/read decoupling under stress, interrupt behavior, full-system integration, the DMA pixel-ingress AXI-Stream frame loader (exact-length load plus short/long-packet rejection), and the DMA-enabled wrapper (AXI-Stream frame burst into BRAM with AXI-Lite readback).
-*   **Status:** All 11 tests pass.
+*   **Coverage:** 12 test modules verify core math, a bit-exact fixed-point golden scoreboard, an independent float-vs-RTL accuracy scoreboard (per-step error < 0.2 mV), pipeline stage alignments, FIFO depth/overflow bounds, AXI-Lite write/read decoupling under stress, interrupt behavior, full-system integration, the DMA pixel-ingress AXI-Stream frame loader (exact-length load plus short/long-packet rejection), and the DMA-enabled wrapper (AXI-Stream frame burst into BRAM with AXI-Lite readback).
+*   **Status:** All 12 tests pass.
 
 ### 2. Vivado 2025.1 Synthesis & Timing Reports
 *   **Target Device:** Xilinx Zynq-7000 (`xc7z020clg400-1`).
@@ -65,4 +65,4 @@ The live demonstration path has been heavily optimized for lean, embedded execut
 *   Pipelined the execution datapath into a 6-stage fixed-point execution engine, achieving 100 MHz timing closure in Vivado 2025.1 with a Worst Negative Slack (WNS) of +0.449 ns and minimal DSP slice footprint.
 *   Developed a pure V4L2 C driver with a custom integer-only downsampling pipeline to eliminate floating-point arithmetic in the hot loop, streaming live USB camera input to the FPGA PL.
 *   Wrote a real-time Rust UDP visualizer to process and display composites of stimulus frames and persistent spiking arrays at 60 FPS.
-*   Built an 11-group Cocotb verification suite covering AXI-Lite register stress, AXI-Stream packetization, interrupts, DMA ingress, and a bit-exact fixed-point scoreboard.
+*   Built a 12-group Cocotb verification suite covering AXI-Lite register stress, AXI-Stream packetization, interrupts, DMA ingress, a bit-exact fixed-point scoreboard, and an independent float-vs-RTL accuracy scoreboard (per-step error < 0.2 mV).
