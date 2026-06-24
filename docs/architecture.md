@@ -41,7 +41,7 @@ board-side demo is `sw/first_light_dma.py` (PYNQ `allocate()` +
 `dma.sendchannel.transfer()`). This path is RTL- and integration-verified in
 simulation AND board-validated on the Zybo Z7-20 (2026-06-23): the DMA overlay
 loads, `dma_frame_loaded` asserts after the burst, the full `system_wrapper`
-timing closes at 100 MHz (WNS +0.346 ns, WHS +0.015 ns; routed report committed
+timing closes at 100 MHz (WNS +0.378 ns, WHS +0.018 ns; routed report committed
 as `vivado/system_timing_summary.txt`), and a timing benchmark
 (`sw/bench_timing.py`) measured the
 pixel load dropping from 312 ms to 0.73 ms vs the AXI-Lite loop — though that

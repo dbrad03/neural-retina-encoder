@@ -49,7 +49,7 @@ The live demonstration path has been heavily optimized for lean, embedded execut
 
 ### 2. Vivado 2025.1 Synthesis & Timing Reports
 *   **Target Device:** Xilinx Zynq-7000 (`xc7z020clg400-1`).
-*   **Timing:** standalone `neuron_array_controller` routes at 100 MHz with **WNS +0.449 ns** and **WHS +0.091 ns**; the full `system_wrapper` overlay (PS + AXI DMA + retina) closes at 100 MHz with **WNS +0.346 ns** and **WHS +0.015 ns** (committed routed report `vivado/system_timing_summary.txt`).
+*   **Timing:** standalone `neuron_array_controller` routes at 100 MHz with **WNS +0.449 ns** and **WHS +0.091 ns**; the full `system_wrapper` overlay (PS + AXI DMA + retina) closes at 100 MHz with **WNS +0.378 ns** and **WHS +0.018 ns** (committed routed report `vivado/system_timing_summary.txt`).
 *   **Resource Utilization:** Standalone design utilizes 994 LUTs (1.87%), 724 Registers (0.68%), 25 RAMB36E1 (17.86%), and 6 DSP48E1 (2.73%).
 *   **Power:** Vivado vector-less standalone estimate reports 0.289 W total on-chip power.
 
