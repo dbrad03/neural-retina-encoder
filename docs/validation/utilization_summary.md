@@ -1,10 +1,10 @@
 # Utilization Summary
 
 - **Device:** Zynq xc7z020clg400-1 (Zybo Z7-20)
-- **Source:** Vivado 2025.1 full-system implementation (`vivado/build_bd.tcl`), post-Phase-2 RTL. Pre-silicon (not yet board-validated).
-- **LUTs:** 1,886 (3.55%)
-- **Registers (FFs):** 1,838 (1.73%)
-- **BRAM (RAMB36E1 tiles):** 42 (30.00%)
-- **DSP48E1:** 10 (4.55%)
+- **Source:** `vivado/util_report.txt`, Vivado 2025.1 routed standalone `neuron_array_controller`, generated 2026-06-15.
+- **LUTs:** 994 (1.87%)
+- **Registers (FFs):** 724 (0.68%)
+- **BRAM (RAMB36E1 tiles):** 25 (17.86%)
+- **DSP48E1:** 6 (2.73%)
 
-*Note: After the Phase-2 RTL changes, DSP usage rose from 6 to 10 and LUTs fell from 1,995 to 1,886. BRAM (30%) is the dominant resource — three 16K-deep memories (v-state, u-state, and the spike FIFO).*
+These numbers are for the standalone datapath report checked into `vivado/`, not the complete Zynq block design with PS and AXI infrastructure. The placement sweep CSV reports a related standalone configuration at roughly 877-880 LUT, 744 FF, 25 BRAM, and 10 DSP depending on directive.

@@ -8,6 +8,7 @@ Ensure your python virtual environment is activated and all dependencies (cocotb
 ```bash
 cd sim
 source ../.venv/bin/activate
+make verify
 ```
 
 ### RTL Validation
@@ -26,6 +27,8 @@ We use Cocotb and Icarus Verilog to validate the SystemVerilog HDL against our b
    ```
    *Claim: Process all 16,384 neurons and streams out valid spikes under dynamic stimuli.*
    **Status: Re-verified and Passing.** Full 128x128 frame integration logic works cleanly, buffering spikes efficiently.
+
+The full `make verify` target runs eleven Cocotb tests: engine, golden model, pipeline, spike FIFO, backpressure/overflow, interrupt logic, foveation zones, AXI-Lite stress, full retina integration, the DMA pixel-ingress AXI-Stream adapter, and the DMA-enabled wrapper integration test. Latest local run: 2026-06-23, all eleven tests passed.
 
 ### System Verification Scripts
 We have several higher-level simulation scripts to analyze bottlenecks and stability limits of the system.

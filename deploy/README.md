@@ -110,9 +110,34 @@ ssh zybo; sudo -i; cd ~xilinx/v4l2_driver && make     # or: make UIO=1
 ```
 Expect: live webcam -> real-time spikes in the visualizer.
 
+## Phase 5b — DMA stimulus input (optional, needs the DMA-enabled overlay)
+The current `vivado/build_bd.tcl` builds a DMA-enabled overlay: `axi_dma_0`
+(MM2S, simple mode) on PS `S_AXI_HP0`, with its stream feeding the retina's
+`s_axis_pixel` ingress (`axi_retina_wrapper` built with `USE_DMA_INGRESS=1`).
+The legacy `/dev/mem` pixel-write path still works on this overlay (DMA has
+priority on the shared BRAM port but is idle unless you transfer), so
+`first_light.py` remains a valid fallback.
+
+```bash
+# laptop:  cd bci_visualizer && cargo run
+# board (root login shell), with the DMA overlay's retina.bit/.hwh present:
+cd /home/xilinx
+/usr/local/share/pynq-venv/bin/python3 first_light_dma.py 10.42.0.1 [image.png]
+```
+`first_light_dma.py` allocates a contiguous PYNQ buffer, fills it with the Q8.10
+frame, bursts it in with `dma.sendchannel.transfer()`, then triggers/drains
+exactly like `first_light.py`. It checks status bit3 (`dma_frame_loaded`) to
+confirm the burst landed. Status bits: 0 start, 1 frame_done, 2 overflow,
+3 dma_frame_loaded, 4 dma_err_short, 5 dma_err_long.
+
+> Not yet hardware-validated. The ingress RTL + wrapper integration pass in
+> simulation (`make verify` tests 10-11); the block design and on-board DMA flow
+> still need a Vivado rebuild and a board run. Measure the AXI-Lite pixel-write
+> cost first (`first_light.py` vs `first_light_dma.py` frame time) to confirm the
+> DMA payoff before relying on it.
+
 ## Phase 6 — Capture + update docs
 - Capture frame latency vs the 1 ms budget, live spike rates, a visualizer
-  recording, and the 2025.1 post-route timing (now hardware-confirmed).
-- Update `README.md` and `PORTFOLIO_HANDOFF.md` to promote claims from
-  "pre-silicon / pending hardware" to "hardware-demonstrated on Zybo Z7-20",
-  staying within the measured results.
+  recording, and clearly sourced 2025.1 post-route timing/utilization reports.
+- Keep README and portfolio claims at "board-demonstrated on Zybo Z7-20" unless
+  longer-duration hardware stress, power, and corner-case artifacts are added.
