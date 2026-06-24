@@ -1,7 +1,7 @@
 # Science Eye FPGA Portfolio Writeup
 
 ## Project Summary
-Science Eye FPGA is a real-time retinal spiking encoder designed for visual prosthetic research. It time-multiplexes 16,384 Izhikevich neuron states in a 128x128 grid, converting physical stimulus frames into biologically realistic spiking dynamics within a 1 ms biological frame budget.
+Science Eye FPGA is a real-time retinal spiking encoder designed for visual prosthetic research. It time-multiplexes 16,384 Izhikevich neuron states in a 128x128 grid, converting physical stimulus frames into biologically *inspired* spiking dynamics (Izhikevich Midget/Parasol model) within a 1 ms frame budget.
 
 ---
 
@@ -15,7 +15,7 @@ Science Eye FPGA is a real-time retinal spiking encoder designed for visual pros
 
 ### 2. SoC Interface & Gated FIFO Drain
 *   **AXI-Lite Register Interface (`axi_retina_wrapper.sv`):** Exposes the 16,384-word pixel BRAM and control/status registers to the Zynq ARM PS (Processing System), enabling raw `/dev/mem` memory-mapped writes.
-*   **Gated AXI-Stream Spike Drain:** While scanning, spike events are buffered in an internal FIFO. Upon frame completion, the controller opens the drain and asserts `spike_last` (TLAST) on the final valid beat. This ensures the downstream AXI-Stream FIFO IP commits the frame's spikes as a single, easily parsable packet.
+*   **Gated AXI-Stream Spike Drain:** While scanning, spike events are buffered in an internal FIFO. Upon frame completion, the controller opens the drain and asserts `spike_last` (TLAST) on the final valid beat, so the downstream AXI-Stream FIFO IP commits the frame's spikes as one TLAST-delimited packet. (A frame with zero spikes emits no beat and therefore no packet; software must finish draining a frame before issuing the next `start`.)
 
 ---
 
@@ -43,7 +43,7 @@ The live demonstration path has been heavily optimized for lean, embedded execut
 ## Verification & Implementation Evidence
 
 ### 1. RTL Functional Verification
-*   **Comprehensive Regression:** Cocotb and Python-based simulation verifies all aspects of the SystemVerilog design using Icarus Verilog.
+*   **Regression Suite:** Cocotb/Python simulation verifies the neuron datapath, the AXI interfaces, and full-array integration on Icarus Verilog.
 *   **Coverage:** 11 test modules verify core math, golden scoreboard comparisons, pipeline stage alignments, FIFO depth/overflow bounds, AXI-Lite write/read decoupling under stress, interrupt behavior, full-system integration, the DMA pixel-ingress AXI-Stream frame loader (exact-length load plus short/long-packet rejection), and the DMA-enabled wrapper (AXI-Stream frame burst into BRAM with AXI-Lite readback).
 *   **Status:** All 11 tests pass.
 
@@ -56,7 +56,7 @@ The live demonstration path has been heavily optimized for lean, embedded execut
 ### 3. Board Demo
 *   **Platform:** Zybo Z7-20 running PYNQ 3.0.1 (Ubuntu 22.04, kernel 5.15).
 *   **Video Input:** Logitech C270 USB UVC camera connected to the J10 Host port.
-*   **Measured Latency:** Hardware-software loop resolves frame processing (camera frame acquisition to UDP packet broadcast) in approximately 320–340 $\mu\text{s}$.
+*   **Measured Latency:** The PL frame evaluation (engine scan + spike-FIFO drain) completes in ~320–340 $\mu\text{s}$, well within the 1 ms biological budget. This is the **hardware processing latency, not** end-to-end camera-to-UDP — the live loop is camera-bound at ~33 ms/frame (30 fps). See `docs/validation/README.md` for the full per-stage breakdown.
 
 ---
 
@@ -65,4 +65,4 @@ The live demonstration path has been heavily optimized for lean, embedded execut
 *   Pipelined the execution datapath into a 6-stage fixed-point execution engine, achieving 100 MHz timing closure in Vivado 2025.1 with a Worst Negative Slack (WNS) of +0.449 ns and minimal DSP slice footprint.
 *   Developed a pure V4L2 C driver with a custom integer-only downsampling pipeline to eliminate floating-point arithmetic in the hot loop, streaming live USB camera input to the FPGA PL.
 *   Wrote a real-time Rust UDP visualizer to process and display composites of stimulus frames and persistent spiking arrays at 60 FPS.
-*   Built a comprehensive Cocotb python verification suite covering AXI-Lite register stress, AXI-Stream packetization, interrupts, and behavioral scoreboard validation.
+*   Built an 11-group Cocotb verification suite covering AXI-Lite register stress, AXI-Stream packetization, interrupts, DMA ingress, and a bit-exact fixed-point scoreboard.

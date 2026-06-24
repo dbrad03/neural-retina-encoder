@@ -56,7 +56,7 @@ During hardware bring-up on 2026-06-22 and 2026-06-23, two critical blockers wer
 - Memory address map verified: retina IP register access at `0x40000000`, AXI FIFO at `0x43C00000`.
 - File-fed `first_light.py` completed frames, drained FIFO packets, and displayed stimulus/spike activity in the Rust visualizer.
 - Live UVC camera path successfully streams frames without crash or lag: captures raw YUYV V4L2 buffers, writes luma stimulus through memory-mapped `/dev/mem` registers using FPU-free integer downsampling, executes hardware logic, and drains spikes via batched UDP packets.
-- Frame latency (from pixel write to FIFO drain) observed around **320-340 $\mu\text{s}$**, safely fitting inside the 1 ms biological frame budget.
+- PL frame latency (pixel write → engine scan → FIFO drain) observed around **320-340 $\mu\text{s}$**, safely inside the 1 ms biological frame budget. This is the hardware processing latency only; the end-to-end live loop is camera-bound at ~30 fps (see the timing benchmark in `validation/README.md`).
 
 ## Claim Boundary
 This artifact supports the "board-demonstrated live path on Zybo Z7-20." It does not by itself prove long-duration thermal stability, all camera video modes, UIO interrupt stability under extreme loads, or complete product validation.

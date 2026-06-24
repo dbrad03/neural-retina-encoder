@@ -10,13 +10,13 @@ This project provides an end-to-end hardware-software retina encoder. The engine
 
 ### Key Features
 - **Large-Scale Spiking Neural Network**: 16,384 Izhikevich neurons structured in a 128x128 grid.
-- **Foveated Architecture**: Biological realism is achieved by mapping Midget cells to the fovea (center) and Parasol cells to the periphery.
-- **Fixed-Point Pipeline**: Q8.10 arithmetic to minimize hardware usage without sacrificing biological fidelity (verified against float models).
+- **Foveated Architecture**: Biologically *inspired* structure — Midget-type (regular-spiking) dynamics are mapped to the fovea (center) and Parasol-type (adapting) dynamics to the periphery.
+- **Fixed-Point Pipeline**: Q8.10 arithmetic to minimize hardware usage. The RTL is verified **bit-exact against a fixed-point golden model** (`sim/test_golden.py`); the fixed-point error versus a floating-point reference is characterized separately, offline, in `sim/fixed_point_compare.cpp`.
 - **BCI Visualizer**: Real-time Rust-based visualizer for UDP stream visualization of the spiking network.
 
 ## Directory Structure
 - **[`hdl/`](hdl/)**: The core SystemVerilog RTL containing the neuron engine, state memory, and array controller.
-- **[`sim/`](sim/)**: Comprehensive simulation framework using Python and Cocotb to verify behavioral correctness, system bandwidth, and integration.
+- **[`sim/`](sim/)**: Cocotb/Python simulation framework verifying the neuron math, the AXI-Lite/AXI-Stream/DMA interfaces, and full-array integration.
 - **[`bci_visualizer/`](bci_visualizer/)**: A Rust UDP visualization tool capable of taking spike streams and overlaying them on stimulus inputs.
 - **[`sw/v4l2_driver/`](sw/v4l2_driver/)**: Supported live-board driver using raw V4L2, `/dev/mem`, and batched UDP spike packets.
 - **[`docs/`](docs/)**: In-depth architecture, biological rationale, and testing documentation.
@@ -73,4 +73,4 @@ The RTL architecture is implemented, the Cocotb regression passes, and the curre
 - **Zynq SoC Block Design:** A fully automated Vivado `build_bd.tcl` script is provided to generate the entire hardware system, connecting the PL (Programmable Logic) retina IP to the PS (Processing System) ARM cores.
 - **Software Driver:** The supported live path is the raw V4L2 C driver ([`sw/v4l2_driver/retina_v4l2.c`](sw/v4l2_driver/retina_v4l2.c)) plus the Rust visualizer. The C driver features an optimized downsampling pipeline using pure integer scaling (`((uint32_t)y * 512) / 5`) to eliminate floating-point arithmetic on the Zynq ARM core.
 - **Verification Coverage:** Verified by Cocotb regression against Python reference behavior. Coverage includes the biological engine, full-frame controller, foveation, AXI stress testing, interrupts, and backpressure/overflow handling.
-- **Board Demo Evidence:** `deploy/README.md` and `docs/validation/hardware_bringup_artifact.md` record the Zybo Z7-20 / PYNQ 3.0.1 context, overlay load, file-fed first-light run, live V4L2 camera run, and observed frame latency around 320-340 us.
+- **Board Demo Evidence:** `deploy/README.md` and `docs/validation/hardware_bringup_artifact.md` record the Zybo Z7-20 / PYNQ 3.0.1 context, overlay load, file-fed first-light run, live V4L2 camera run, and a PL frame-evaluation latency (engine scan + spike-FIFO drain) around 320-340 us. The end-to-end live loop is camera-bound (~30 fps); see the per-stage timing benchmark in `docs/validation/README.md`.

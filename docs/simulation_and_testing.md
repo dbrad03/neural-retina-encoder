@@ -18,7 +18,7 @@ We use Cocotb and Icarus Verilog to validate the SystemVerilog HDL against our b
    ```bash
    python test_izh_engine.py
    ```
-   *Claim: RTL output matches biological expectations within 1% error margin.*
+   *Claim: the fixed-point engine integrates membrane voltage correctly — charging under stimulus and resetting at threshold. (Bit-exact RTL-vs-fixed-point-reference checking is in `test_golden.py`; floating-point error is characterized offline in `sim/fixed_point_compare.cpp`, not in this regression.)*
    **Status: Re-verified and Passing.** The fixed-point integration properly calculates membrane voltage jumps when stimulated.
 
 2. **Test 16,384 Array Controller**:

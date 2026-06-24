@@ -106,5 +106,12 @@ wait_on_run synth_1
 launch_runs impl_1 -to_step write_bitstream -jobs 4
 wait_on_run impl_1
 
+# Emit compact, committable full-system (system_wrapper) reports so the routed
+# timing/utilization claims are reproducible from the repo (commit these).
+open_run impl_1
+report_timing_summary -file system_timing_summary.txt
+report_utilization    -file system_util_summary.txt
+report_power          -file system_power_summary.txt
+
 # Export Hardware (XSA) for Vitis/Petalinux
 write_hw_platform -fixed -include_bit -force -file system_wrapper.xsa
