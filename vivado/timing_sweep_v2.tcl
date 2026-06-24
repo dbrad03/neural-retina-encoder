@@ -24,7 +24,7 @@ file mkdir $OUTDIR
 set CSV $OUTDIR/sweep_v2.csv
 
 # Strategy matrices (kept modest so the sweep finishes in reasonable wall-clock).
-set SYNTH_DIRS_A {default AreaOptimized_high PerformanceOptimized AlternateRoutability FlowAreaOptimized}
+set SYNTH_DIRS_A {default RuntimeOptimized AreaOptimized_high PerformanceOptimized AlternateRoutability}
 set PLACE_DIRS_A {Default Explore WLDrivenBlockPlacement EarlyBlockPlacement}
 set SYNTH_DIRS_B {default AreaOptimized_high PerformanceOptimized}
 set PLACE_DIRS_B {Default Explore}
@@ -120,7 +120,11 @@ foreach sd $SYNTH_DIRS_A {
     set dcp $OUTDIR/synthA_$sd.dcp
     read_verilog -sv $SRC_A
     read_xdc ./constraints.xdc
-    synth_design -top neuron_array_controller -part $PART -directive $sd
+    if {[catch {synth_design -top neuron_array_controller -part $PART -directive $sd} err]} {
+        puts "WARN: synth -directive $sd failed ($err); skipping this directive"
+        catch {close_design}
+        continue
+    }
     write_checkpoint -force $dcp
     close_design
     foreach pd $PLACE_DIRS_A {
@@ -144,8 +148,12 @@ set SRC_B {
 foreach sd $SYNTH_DIRS_B {
     set dcp $OUTDIR/synthB_$sd.dcp
     read_verilog -sv $SRC_B
-    synth_design -top axi_retina_wrapper -part $PART -directive $sd \
-        -generic NUM_NEURONS=16384 -generic ADDR_WIDTH=14
+    if {[catch {synth_design -top axi_retina_wrapper -part $PART -directive $sd \
+            -generic NUM_NEURONS=16384 -generic ADDR_WIDTH=14} err]} {
+        puts "WARN: wrapper synth -directive $sd failed ($err); skipping this directive"
+        catch {close_design}
+        continue
+    }
     create_clock -period 10.000 -name aclk [get_ports aclk]
     write_checkpoint -force $dcp
     close_design
