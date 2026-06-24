@@ -1,66 +1,102 @@
-use minifb::{Key, Window, WindowOptions};
-use crossbeam_channel::{unbounded, Receiver};
+use crossbeam_channel::bounded;
+use minifb::{Key, Scale, ScaleMode, Window, WindowOptions};
 use std::net::UdpSocket;
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 const GRID_SIZE: usize = 128;
 const WIN_WIDTH: usize = GRID_SIZE * 2;
 const WIN_HEIGHT: usize = GRID_SIZE * 2;
+const MIN_WINDOW_SIZE: usize = 256;
 
-// --- RUST CONCEPT: ENUMS ---
-// This is like a Verilog 'struct' but with a built-in 'type' field.
-// It allows us to pass different kinds of data through the same channel.
 enum VisualizerEvent {
-    Spike(usize),                 // A single 14-bit address
-    StimulusFrame(Vec<u8>),       // A full 128x128 greyscale frame
+    Spike(usize),
+    SpikeBatch(Vec<usize>),
+    StimulusFrame(Vec<u8>),
 }
 
 fn main() {
-    let (tx, rx) = unbounded::<VisualizerEvent>();
+    let (tx, rx) = bounded::<VisualizerEvent>(1024);
 
     // --- NETWORK THREAD ---
     thread::spawn(move || {
-        let socket = UdpSocket::bind("127.0.0.1:8080").expect("Could not bind UDP socket");
+        let socket = UdpSocket::bind("0.0.0.0:8080").expect("Could not bind UDP socket");
+        println!("Listening for retina UDP packets on 0.0.0.0:8080");
         let mut buf = [0u8; 16385]; // Large enough for a header + full frame
+        let mut spike_count: u64 = 0;
+        let mut spike_packet_count: u64 = 0;
+        let mut image_count: u64 = 0;
+        let mut last_report = Instant::now();
 
         loop {
-            if let Ok((amt, _src)) = socket.recv_from(&mut buf) {
+            if let Ok((amt, src)) = socket.recv_from(&mut buf) {
                 match buf[0] {
-                    1 => { // Spike Packet: [1, Addr_High, Addr_Low]
+                    1 => { // Legacy spike packet: [1, addr_hi, addr_lo]
                         if amt >= 3 {
                             let addr = ((buf[1] as usize) << 8) | (buf[2] as usize);
-                            let _ = tx.send(VisualizerEvent::Spike(addr));
+                            spike_count += 1;
+                            spike_packet_count += 1;
+                            let _ = tx.try_send(VisualizerEvent::Spike(addr));
                         }
                     }
-                    2 => { // Stimulus Packet: [2, Pixel0, Pixel1, ...]
+                    2 => { // Stimulus frame: [2, 128*128 luma bytes]
                         if amt >= 1 + (GRID_SIZE * GRID_SIZE) {
                             let frame = buf[1..1 + (GRID_SIZE * GRID_SIZE)].to_vec();
-                            let _ = tx.send(VisualizerEvent::StimulusFrame(frame));
+                            image_count += 1;
+                            let _ = tx.try_send(VisualizerEvent::StimulusFrame(frame));
+                        }
+                    }
+                    3 => { // Spike batch: [3, count_hi, count_lo, addr_hi, addr_lo, ...]
+                        if amt >= 3 {
+                            let declared = ((buf[1] as usize) << 8) | (buf[2] as usize);
+                            let available = (amt - 3) / 2;
+                            let count = declared.min(available);
+                            let mut spikes = Vec::with_capacity(count);
+                            for i in 0..count {
+                                let off = 3 + i * 2;
+                                spikes.push(((buf[off] as usize) << 8) | (buf[off + 1] as usize));
+                            }
+                            spike_count += count as u64;
+                            spike_packet_count += 1;
+                            let _ = tx.try_send(VisualizerEvent::SpikeBatch(spikes));
                         }
                     }
                     _ => {}
+                }
+
+                if last_report.elapsed() >= Duration::from_secs(1) {
+                    println!(
+                        "UDP from {src}: {image_count} image packets, {spike_count} spikes in {spike_packet_count} spike packets"
+                    );
+                    image_count = 0;
+                    spike_count = 0;
+                    spike_packet_count = 0;
+                    last_report = Instant::now();
                 }
             }
         }
     });
 
     // --- UI THREAD ---
-    let mut buffer: Vec<u32> = vec![0; WIN_WIDTH * WIN_HEIGHT];
+    let mut logical_buffer: Vec<u32> = vec![0; WIN_WIDTH * WIN_HEIGHT];
+    let mut window_buffer: Vec<u32> = vec![0; WIN_WIDTH * WIN_HEIGHT];
     let mut persistence_buffer: Vec<u32> = vec![0; GRID_SIZE * GRID_SIZE];
     let mut stimulus_buffer: Vec<u8> = vec![0; GRID_SIZE * GRID_SIZE];
+    let mut instant_spikes: Vec<bool> = vec![false; GRID_SIZE * GRID_SIZE];
     
     let mut window = Window::new(
         "Science Eye Quadrant Visualizer",
         WIN_WIDTH,
         WIN_HEIGHT,
         WindowOptions {
-            scale: minifb::Scale::X2,
+            resize: true,
+            scale: Scale::X4,
+            scale_mode: ScaleMode::Stretch,
             ..WindowOptions::default()
         },
     ).unwrap();
 
-    window.limit_update_rate(Some(Duration::from_micros(16600)));
+    window.set_target_fps(60);
 
     while window.is_open() && !window.is_key_down(Key::Escape) {
         
@@ -71,13 +107,21 @@ fn main() {
         }
 
         // 2. Process new events from the Network
-        let mut instant_spikes: Vec<usize> = Vec::new();
+        instant_spikes.fill(false);
         for event in rx.try_iter() {
             match event {
                 VisualizerEvent::Spike(addr) => {
                     if addr < GRID_SIZE * GRID_SIZE {
-                        instant_spikes.push(addr);
+                        instant_spikes[addr] = true;
                         persistence_buffer[addr] = 0x00FF00; // Bright Green
+                    }
+                }
+                VisualizerEvent::SpikeBatch(spikes) => {
+                    for addr in spikes {
+                        if addr < GRID_SIZE * GRID_SIZE {
+                            instant_spikes[addr] = true;
+                            persistence_buffer[addr] = 0x00FF00; // Bright Green
+                        }
                     }
                 }
                 VisualizerEvent::StimulusFrame(frame) => {
@@ -117,43 +161,43 @@ fn main() {
                 match (quad_x, quad_y) {
                     (0, 0) => { // TOP-LEFT: Stimulus (Greyscale)
                         let val = stimulus_buffer[idx];
-                        buffer[out_idx] = (val as u32) << 16 | (val as u32) << 8 | (val as u32);
+                        logical_buffer[out_idx] = (val as u32) << 16 | (val as u32) << 8 | (val as u32);
                     }
                     (1, 0) => { // TOP-RIGHT: Instant Spikes (White)
-                        if instant_spikes.contains(&idx) {
-                            buffer[out_idx] = 0xFFFFFF;
+                        if instant_spikes[idx] {
+                            logical_buffer[out_idx] = 0xFFFFFF;
                         } else if is_eye_drawing {
-                            buffer[out_idx] = eye_color;
+                            logical_buffer[out_idx] = eye_color;
                         } else if is_grid_line {
-                            buffer[out_idx] = grid_color;
+                            logical_buffer[out_idx] = grid_color;
                         } else {
-                            buffer[out_idx] = 0;
+                            logical_buffer[out_idx] = 0;
                         }
                     }
                     (0, 1) => { // BOTTOM-LEFT: Persistence (Green)
                         let p = persistence_buffer[idx];
                         if p > 0 {
-                            buffer[out_idx] = p;
+                            logical_buffer[out_idx] = p;
                         } else if is_eye_drawing {
-                            buffer[out_idx] = eye_color;
+                            logical_buffer[out_idx] = eye_color;
                         } else if is_grid_line {
-                            buffer[out_idx] = grid_color;
+                            logical_buffer[out_idx] = grid_color;
                         } else {
-                            buffer[out_idx] = 0;
+                            logical_buffer[out_idx] = 0;
                         }
                     }
                     (1, 1) => { // BOTTOM-RIGHT: Composite View (Stimulus + Instant Spikes)
                         let val = stimulus_buffer[idx] / 2;
                         let base_bg = val as u32; // Dim blue background for stimulus
                         
-                        if instant_spikes.contains(&idx) {
-                            buffer[out_idx] = 0xFFFFFF; // White flash
+                        if instant_spikes[idx] {
+                            logical_buffer[out_idx] = 0xFFFFFF; // White flash
                         } else if is_eye_drawing {
-                            buffer[out_idx] = eye_color | base_bg;
+                            logical_buffer[out_idx] = eye_color | base_bg;
                         } else if is_grid_line {
-                            buffer[out_idx] = grid_color | base_bg;
+                            logical_buffer[out_idx] = grid_color | base_bg;
                         } else {
-                            buffer[out_idx] = base_bg;
+                            logical_buffer[out_idx] = base_bg;
                         }
                     }
                     _ => {}
@@ -161,6 +205,20 @@ fn main() {
             }
         }
 
-        window.update_with_buffer(&buffer, WIN_WIDTH, WIN_HEIGHT).unwrap();
+        let (window_w, window_h) = window.get_size();
+        let render_size = window_w.min(window_h).max(MIN_WINDOW_SIZE);
+        if window_buffer.len() != render_size * render_size {
+            window_buffer.resize(render_size * render_size, 0);
+        }
+
+        for y in 0..render_size {
+            let sy = y * WIN_HEIGHT / render_size;
+            for x in 0..render_size {
+                let sx = x * WIN_WIDTH / render_size;
+                window_buffer[y * render_size + x] = logical_buffer[sy * WIN_WIDTH + sx];
+            }
+        }
+
+        window.update_with_buffer(&window_buffer, render_size, render_size).unwrap();
     }
 }

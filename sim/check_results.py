@@ -16,6 +16,11 @@ try:
     for suite in root.findall(".//testsuite"):
         fails += int(suite.attrib.get("failures", 0))
         errs += int(suite.attrib.get("errors", 0))
+
+    # Cocotb 2.x may emit <failure>/<error> children without aggregate
+    # failures/errors attributes, so count the elements directly as well.
+    fails += len(root.findall(".//failure"))
+    errs += len(root.findall(".//error"))
         
     if fails > 0 or errs > 0:
         print(f"TEST FAILED: {fails} failures, {errs} errors")

@@ -83,8 +83,13 @@ async def test_backpressure_and_overflow(dut):
         
     spikes_rcv = []
     while not axis_sink.empty():
-        spike = await axis_sink.recv()
-        spikes_rcv.append(int.from_bytes(spike.tdata, "little"))
+        frame = await axis_sink.recv()
+        data = bytes(frame.tdata)
+        assert len(data) % 2 == 0, f"AXIS packet has odd byte length: {len(data)}"
+        spikes_rcv.extend(
+            int.from_bytes(data[i:i+2], "little")
+            for i in range(0, len(data), 2)
+        )
         
     dut._log.info(f"Received {len(spikes_rcv)} spikes: {[hex(s) for s in spikes_rcv]}")
     # The system capacity is FIFO_DEPTH (16) + 1 for the output register (spike_data/spike_valid)
