@@ -21,4 +21,8 @@ verify:
 	python test_axi_stress.py && python check_results.py && \
 	echo "--- 9. Testing Full Retina System Integration ---" && \
 	python test_retina_system.py && python check_results.py && \
+	echo "--- 10. Testing DMA Pixel Ingress (AXI-Stream) ---" && \
+	python test_pixel_ingress.py && python check_results.py && \
+	echo "--- 11. Testing DMA Wrapper Integration (AXI-Stream -> BRAM) ---" && \
+	python test_dma_wrapper.py && python check_results.py && \
 	echo "All tests passed successfully!"
