@@ -9,7 +9,15 @@ Ensure your python virtual environment is activated and all dependencies (cocotb
 cd sim
 source ../.venv/bin/activate
 make verify
+make coverage
 ```
+
+The functional-coverage target is independent of the twelve directed
+regression groups. It uses fixed seeds and explicit hit requirements, emits
+per-workload YAML, and creates merged `functional_coverage.yml` and
+`functional_coverage.md` reports under the ignored `coverage_build/`
+directory. Only declared critical bins gate CI; the aggregate percentage is
+reported for context.
 
 ### RTL Validation
 We use Cocotb and Icarus Verilog to validate the SystemVerilog HDL against our biological goals.

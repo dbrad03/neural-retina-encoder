@@ -41,7 +41,13 @@ The RTL regression is implemented with Python/Cocotb and Icarus Verilog. The cur
 cd sim
 source ../.venv/bin/activate
 make verify
+make coverage
 ```
+
+`make coverage` runs the deterministic functional-coverage workloads, gates
+declared critical bins, and writes YAML plus Markdown reports to the ignored
+`coverage_build/` directory. The aggregate percentage is informational; CI
+gates the named bins rather than requiring a global percentage.
 
 ### Starting the Visualizer
 For the live board demo or UDP-emitting simulations, run the visualizer in release mode:

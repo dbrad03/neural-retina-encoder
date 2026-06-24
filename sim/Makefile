@@ -1,4 +1,4 @@
-.PHONY: verify
+.PHONY: verify coverage
 
 verify:
 	@echo "Running all Cocotb tests..."
@@ -28,3 +28,22 @@ verify:
 	echo "--- 12. Testing Float-vs-RTL Accuracy Scoreboard ---" && \
 	python test_float_scoreboard.py && python check_results.py && \
 	echo "All tests passed successfully!"
+
+coverage:
+	@echo "Running deterministic functional coverage suite..."
+	@source ../.venv/bin/activate && \
+	mkdir -p ../coverage_build && \
+	COCOTB_RANDOM_SEED=1592639710 COVERAGE_OUTPUT=$(abspath ../coverage_build/engine.yml) python coverage/test_cov_engine.py && \
+	COCOTB_RANDOM_SEED=1592639710 COVERAGE_OUTPUT=$(abspath ../coverage_build/controller.yml) python coverage/test_cov_neuron.py && \
+	COCOTB_RANDOM_SEED=1592639710 COVERAGE_OUTPUT=$(abspath ../coverage_build/fifo.yml) python coverage/test_cov_fifo.py && \
+	COCOTB_RANDOM_SEED=1592639710 COVERAGE_OUTPUT=$(abspath ../coverage_build/ingress.yml) python coverage/test_cov_ingress.py && \
+	COCOTB_RANDOM_SEED=1592639710 COVERAGE_OUTPUT=$(abspath ../coverage_build/wrapper.yml) python coverage/test_cov_wrapper.py && \
+	python coverage/merge_coverage.py \
+	  --input ../coverage_build/engine.yml \
+	  --input ../coverage_build/controller.yml \
+	  --input ../coverage_build/fifo.yml \
+	  --input ../coverage_build/ingress.yml \
+	  --input ../coverage_build/wrapper.yml \
+	  --yaml ../coverage_build/functional_coverage.yml \
+	  --markdown ../coverage_build/functional_coverage.md && \
+	echo "Functional coverage passed; reports are in coverage_build/."

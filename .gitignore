@@ -30,8 +30,10 @@ vivado/.Xil/
 
 # Python & Cocotb
 sim/__pycache__/
+__pycache__/
 sim/sim_build/
 sim_build/
+coverage_build/
 sim/*.vcd
 sim/neuron_sim
 sim/fixed_point_compare
