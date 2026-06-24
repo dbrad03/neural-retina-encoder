@@ -13,8 +13,32 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Icarus Verilog
-        run: sudo apt-get update && sudo apt-get install -y iverilog
+      # ubuntu-latest's apt ships Icarus 12, which can't elaborate the package
+      # functions (s2c/c2s/fp_mul) reached via `import izh_pkg::*` -- fixed in
+      # Icarus 13. Build 13.0 from source (cached across runs) to match local.
+      - name: Cache Icarus Verilog 13
+        id: cache-iverilog
+        uses: actions/cache@v4
+        with:
+          path: /opt/iverilog13
+          key: iverilog-13_0-${{ runner.os }}
+
+      - name: Build Icarus Verilog 13
+        if: steps.cache-iverilog.outputs.cache-hit != 'true'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y autoconf gperf flex bison g++ make git
+          git clone --depth 1 --branch v13_0 https://github.com/steveicarus/iverilog.git /tmp/iverilog
+          cd /tmp/iverilog
+          sh autoconf.sh
+          ./configure --prefix=/opt/iverilog13
+          make -j"$(nproc)"
+          make install
+
+      - name: Add Icarus 13 to PATH
+        run: |
+          echo "/opt/iverilog13/bin" >> "$GITHUB_PATH"
+          /opt/iverilog13/bin/iverilog -V | head -1
 
       - uses: actions/setup-python@v5
         with:
