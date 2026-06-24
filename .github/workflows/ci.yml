@@ -61,7 +61,7 @@ jobs:
         run: gcc -Wall -Wextra -std=c11 -c sw/v4l2_driver/retina_v4l2.c -o /tmp/retina_v4l2.o
 
   lint:
-    name: Verilator lint (report)
+    name: Verilator lint
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -69,12 +69,14 @@ jobs:
       - name: Install Verilator
         run: sudo apt-get update && sudo apt-get install -y verilator
 
-      # Report mode: -Wno-fatal surfaces warnings in the log without failing the
-      # build (style-only classes suppressed). Tighten to gating once the RTL is
-      # warning-clean.
+      # Gating lint. WIDTHTRUNC (potential data loss) is fixed in the RTL.
+      # Suppressed classes are benign/stylistic: TIMESCALEMOD (cocotb sets the
+      # timescale at build), IMPORTSTAR (intentional izh_pkg import), WIDTHEXPAND
+      # (safe zero-extend in comparisons), plus naming/unused/empty-pin style.
       - name: Lint RTL
         run: |
-          verilator --lint-only -Wall -sv -Wno-fatal \
+          verilator --lint-only -Wall -sv \
+            -Wno-TIMESCALEMOD -Wno-IMPORTSTAR -Wno-WIDTHEXPAND \
             -Wno-DECLFILENAME -Wno-UNUSEDSIGNAL -Wno-UNUSEDPARAM \
             -Wno-PINCONNECTEMPTY -Wno-VARHIDDEN \
             hdl/izh_pkg.sv hdl/izh_neuron_engine.sv hdl/neuron_state_mem.sv \

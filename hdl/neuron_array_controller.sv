@@ -92,8 +92,8 @@ module neuron_array_controller #(
     always_comb begin
         dx = $signed({1'b0, x_coord}) - 8'sd64;
         dy = $signed({1'b0, y_coord}) - 8'sd64;
-        abs_dx = (dx < 0) ? -dx : dx;
-        abs_dy = (dy < 0) ? -dy : dy;
+        abs_dx = 7'((dx < 0) ? -dx : dx);  // |dx| <= 64 fits in 7 bits
+        abs_dy = 7'((dy < 0) ? -dy : dy);
         dist_val = {1'b0, abs_dx} + {1'b0, abs_dy};
         is_midget_comb = (dist_val < 8'd45);
     end
@@ -170,8 +170,8 @@ module neuron_array_controller #(
 
                 SCANNING: begin
                     if (scan_cnt < NUM_NEURONS) begin
-                        rd_addr <= scan_cnt;
-                        pixel_addr <= scan_cnt;
+                        rd_addr <= scan_cnt[ADDR_WIDTH-1:0];
+                        pixel_addr <= scan_cnt[ADDR_WIDTH-1:0];
                         scan_cnt <= scan_cnt + 1;
                         engine_start <= 1'b1;
                     end else begin
