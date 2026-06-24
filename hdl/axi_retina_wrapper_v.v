@@ -31,13 +31,20 @@ module axi_retina_wrapper_v (
     output wire         m_axis_tlast,
     input  wire         m_axis_tready,
 
+    // S_AXIS_PIXEL (AXI DMA MM2S -> pixel BRAM)
+    input  wire [31:0]  s_axis_pixel_tdata,
+    input  wire         s_axis_pixel_tvalid,
+    output wire         s_axis_pixel_tready,
+    input  wire         s_axis_pixel_tlast,
+
     // Interrupts
     output wire         frame_done_irq
 );
 
     axi_retina_wrapper #(
         .NUM_NEURONS(16384),
-        .ADDR_WIDTH(14)
+        .ADDR_WIDTH(14),
+        .USE_DMA_INGRESS(1'b1)
     ) inst (
         .aclk(aclk),
         .aresetn(aresetn),
@@ -64,6 +71,10 @@ module axi_retina_wrapper_v (
         .m_axis_tvalid(m_axis_tvalid),
         .m_axis_tlast(m_axis_tlast),
         .m_axis_tready(m_axis_tready),
+        .s_axis_pixel_tdata(s_axis_pixel_tdata),
+        .s_axis_pixel_tvalid(s_axis_pixel_tvalid),
+        .s_axis_pixel_tready(s_axis_pixel_tready),
+        .s_axis_pixel_tlast(s_axis_pixel_tlast),
         .frame_done_irq(frame_done_irq)
     );
 

@@ -8,7 +8,16 @@ Ensure your python virtual environment is activated and all dependencies (cocotb
 ```bash
 cd sim
 source ../.venv/bin/activate
+make verify
+make coverage
 ```
+
+The functional-coverage target is independent of the twelve directed
+regression groups. It uses fixed seeds and explicit hit requirements, emits
+per-workload YAML, and creates merged `functional_coverage.yml` and
+`functional_coverage.md` reports under the ignored `coverage_build/`
+directory. Only declared critical bins gate CI; the aggregate percentage is
+reported for context.
 
 ### RTL Validation
 We use Cocotb and Icarus Verilog to validate the SystemVerilog HDL against our biological goals.
@@ -17,7 +26,7 @@ We use Cocotb and Icarus Verilog to validate the SystemVerilog HDL against our b
    ```bash
    python test_izh_engine.py
    ```
-   *Claim: RTL output matches biological expectations within 1% error margin.*
+   *Claim: the fixed-point engine integrates membrane voltage correctly — charging under stimulus and resetting at threshold. (Bit-exact RTL-vs-fixed-point-reference checking is in `test_golden.py`; floating-point error is characterized offline in `sim/fixed_point_compare.cpp`, not in this regression.)*
    **Status: Re-verified and Passing.** The fixed-point integration properly calculates membrane voltage jumps when stimulated.
 
 2. **Test 16,384 Array Controller**:
@@ -26,6 +35,8 @@ We use Cocotb and Icarus Verilog to validate the SystemVerilog HDL against our b
    ```
    *Claim: Process all 16,384 neurons and streams out valid spikes under dynamic stimuli.*
    **Status: Re-verified and Passing.** Full 128x128 frame integration logic works cleanly, buffering spikes efficiently.
+
+The full `make verify` target runs twelve Cocotb tests: engine, golden model, pipeline, spike FIFO, backpressure/overflow, interrupt logic, foveation zones, AXI-Lite stress, full retina integration, the DMA pixel-ingress AXI-Stream adapter, the DMA-enabled wrapper integration test, and a float-vs-RTL accuracy scoreboard. Latest local run: 2026-06-24, all twelve tests passed.
 
 ### System Verification Scripts
 We have several higher-level simulation scripts to analyze bottlenecks and stability limits of the system.

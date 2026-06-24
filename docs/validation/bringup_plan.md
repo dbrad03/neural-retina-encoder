@@ -1,6 +1,6 @@
 # Physical Bring-up Plan
 
-Once the Zybo Z7-20 board arrives, we will perform the following validation procedure:
+The initial Zybo Z7-20 bring-up has completed; see `hardware_bringup_artifact.md` for the current artifact summary. The remaining plan below is for deeper validation and repeatable evidence capture.
 
 1. **Physical Setup:**
    - Connect Zybo power and micro-USB UART/JTAG.
@@ -14,9 +14,9 @@ Once the Zybo Z7-20 board arrives, we will perform the following validation proc
    - **Artifact:** Console screenshot showing successful UIO binding.
 
 3. **Software Driver Bring-up:**
-   - Copy `retina_driver` and `system_wrapper.bit` to the board.
-   - Load the bitstream into the FPGA fabric.
-   - Run `sudo ./retina_driver <LAPTOP_IP>`.
+   - Copy `retina.bit`, `retina.hwh`, and the board software to the board.
+   - Load the overlay through PYNQ.
+   - Run file-fed `first_light.py`, then `retina_v4l2 <LAPTOP_IP> /dev/video0`.
    - **Artifact:** Serial/log output showing successful `/dev/mem` mmap and camera initialization.
 
 4. **Network & Timing Validation:**
@@ -25,7 +25,7 @@ Once the Zybo Z7-20 board arrives, we will perform the following validation proc
    - **Artifact:** Wireshark/tcpdump capture log.
 
 5. **Visual Validation:**
-   - Launch the Rust `bci_visualizer`.
+   - Launch the Rust `bci_visualizer` in release mode.
    - Observe the real-time spiking network reacting to live physical stimuli.
    - **Artifact:** Video screen-recording of the visualizer.
 

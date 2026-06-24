@@ -1,21 +1,24 @@
 # Science Eye FPGA: Foveated 128x128 Izhikevich Retina Encoder
 
+[![CI](https://github.com/dbrad03/neural-retina-encoder/actions/workflows/ci.yml/badge.svg)](https://github.com/dbrad03/neural-retina-encoder/actions/workflows/ci.yml)
+
 A real-time hardware implementation of a foveated retinal ganglion cell encoder using the Izhikevich spiking neuron model, designed for the Science Eye visual prosthetic. It evaluates 16,384 neuron states sequentially/time-multiplexed within a 1ms biological timeframe on an FPGA.
 
 ## Project Overview
 
-This project provides a complete end-to-end hardware-software system for simulating a retina. The engine receives "pixel" inputs and emits "spikes" that emulate the human eye's Midget (steady response) and Parasol (bursting response) ganglion cells via diamond-foveation logic.
+This project provides an end-to-end hardware-software retina encoder. The engine receives pixel stimulus inputs and emits spikes that emulate the human eye's Midget (steady response) and Parasol (bursting response) ganglion cells via diamond-foveation logic.
 
 ### Key Features
 - **Large-Scale Spiking Neural Network**: 16,384 Izhikevich neurons structured in a 128x128 grid.
-- **Foveated Architecture**: Biological realism is achieved by mapping Midget cells to the fovea (center) and Parasol cells to the periphery.
-- **Fixed-Point Pipeline**: Q8.10 arithmetic to minimize hardware usage without sacrificing biological fidelity (verified against float models).
+- **Foveated Architecture**: Biologically *inspired* structure — Midget-type (regular-spiking) dynamics are mapped to the fovea (center) and Parasol-type (adapting) dynamics to the periphery.
+- **Fixed-Point Pipeline**: Q8.10 arithmetic to minimize hardware usage. The RTL is verified **bit-exact against a fixed-point golden model** (`sim/test_golden.py`) and **accuracy-checked against an independent floating-point reference** in the regression (`sim/test_float_scoreboard.py`): per-step membrane error stays under ~0.005 mV (limit 0.2 mV), with matching spike rate.
 - **BCI Visualizer**: Real-time Rust-based visualizer for UDP stream visualization of the spiking network.
 
 ## Directory Structure
 - **[`hdl/`](hdl/)**: The core SystemVerilog RTL containing the neuron engine, state memory, and array controller.
-- **[`sim/`](sim/)**: Comprehensive simulation framework using Python and Cocotb to verify behavioral correctness, system bandwidth, and integration.
+- **[`sim/`](sim/)**: Cocotb/Python simulation framework verifying the neuron math, the AXI-Lite/AXI-Stream/DMA interfaces, and full-array integration.
 - **[`bci_visualizer/`](bci_visualizer/)**: A Rust UDP visualization tool capable of taking spike streams and overlaying them on stimulus inputs.
+- **[`sw/v4l2_driver/`](sw/v4l2_driver/)**: Supported live-board driver using raw V4L2, `/dev/mem`, and batched UDP spike packets.
 - **[`docs/`](docs/)**: In-depth architecture, biological rationale, and testing documentation.
 
 ## Documentation Index
@@ -32,21 +35,31 @@ This project provides a complete end-to-end hardware-software system for simulat
 - Rust and Cargo
 
 ### Running Tests
-All tests are implemented via Python/Cocotb. We have re-verified that all claimed properties (biological engine behavior, full 128x128 array multiplexing) are completely functional and pass cleanly.
+The RTL regression is implemented with Python/Cocotb and Icarus Verilog. The current regression target is twelve tests covering the neuron engine, fixed-point scoreboard, pipeline alignment, FIFO behavior, AXI backpressure, interrupts, foveation boundaries, AXI-Lite stress, full-system integration, the DMA pixel-ingress AXI-Stream adapter, the DMA-enabled wrapper integration, and a float-vs-RTL accuracy scoreboard.
 
 ```bash
 cd sim
 source ../.venv/bin/activate
-python test_izh_engine.py
-python test_retina_system.py
+make verify
+make coverage
 ```
 
+`make coverage` runs the deterministic functional-coverage workloads, gates
+declared critical bins, and writes YAML plus Markdown reports to the ignored
+`coverage_build/` directory. The aggregate percentage is informational; CI
+gates the named bins rather than requiring a global percentage.
+
 ### Starting the Visualizer
-To see the spiking activity broadcasted from the `test_retina_system.py` test:
+For the live board demo or UDP-emitting simulations, run the visualizer in release mode:
 ```bash
 cd bci_visualizer
-cargo run
+cargo run --release
 ```
+
+UDP protocol:
+- packet `2`: `[2, 128*128 stimulus bytes]`
+- packet `3`: `[3, count_hi, count_lo, addr_hi, addr_lo, ...]`
+- packet `1`: legacy single-spike packet retained by the visualizer for compatibility
 
 ## Hardware Bringup
 
@@ -59,9 +72,11 @@ live V4L2 camera). Supporting software for bring-up lives in `sw/`:
 
 ## Status & Accomplishments
 
-The full RTL architecture is implemented and **Pre-silicon verified through RTL simulation.**
-- **100MHz Timing Closure:** Implemented a deeply-optimized 6-stage execution pipeline that meets 100MHz on a Zynq-7000 (Zybo Z7-20). A single pipelined neuron engine is time-multiplexed across 16,384 neuron states per frame; Vivado maps the datapath to 10 DSP48E1 slices. The post-Phase-2 full-system implementation (Vivado 2025.1) routes with **WNS +0.533 ns at 100MHz** (1,886 LUT / 1,838 FF / 42 BRAM / 10 DSP), and closure holds across a 10-directive placement sweep *(pre-silicon implementation result; physical board validation pending)*.
+The RTL architecture is implemented, the Cocotb regression passes, and the current overlay has been board-demonstrated on a Zybo Z7-20 with both file-fed stimulus and a live UVC camera path. This is a working bring-up/demo path, not a claim of exhaustive hardware validation.
+
+- **100MHz Timing Closure:** The standalone `neuron_array_controller` datapath routes at 100 MHz on `xc7z020clg400-1` in Vivado 2025.1 with **WNS +0.449 ns** and no failing setup/hold endpoints (`vivado/timing_report.txt`, generated 2026-06-15). A 10-directive placement sweep of the same datapath also met timing, with worst-case WNS +0.396 ns.
 - **AXI-Lite & AXI-Stream Integration:** The hardware engine is wrapped in standard AMBA AXI interfaces. AXI-Lite is used for memory-mapped pixel stimulus and control, while AXI-Stream is used for the high-bandwidth 16-bit spike output.
 - **Zynq SoC Block Design:** A fully automated Vivado `build_bd.tcl` script is provided to generate the entire hardware system, connecting the PL (Programmable Logic) retina IP to the PS (Processing System) ARM cores.
-- **Software Driver:** Includes both a bare-metal Python driver and a high-performance **C++ OpenCV Driver** (`sw/c_driver/main.cpp`) that captures a live physical USB webcam feed, pushes it directly into the FPGA via `/dev/mem`, and streams the biological spikes over UDP.
-- **Verification Coverage:** Strongly verified by Cocotb regression. Verifies the biological engine, full-frame controller, Foveation, AXI stress testing, interrupts, and backpressure/overflow handling against a golden Python scoreboard.
+- **Software Driver:** The supported live path is the raw V4L2 C driver ([`sw/v4l2_driver/retina_v4l2.c`](sw/v4l2_driver/retina_v4l2.c)) plus the Rust visualizer. The C driver features an optimized downsampling pipeline using pure integer scaling (`((uint32_t)y * 512) / 5`) to eliminate floating-point arithmetic on the Zynq ARM core.
+- **Verification Coverage:** Verified by Cocotb regression against Python reference behavior. Coverage includes the biological engine, full-frame controller, foveation, AXI stress testing, interrupts, and backpressure/overflow handling.
+- **Board Demo Evidence:** `deploy/README.md` and `docs/validation/hardware_bringup_artifact.md` record the Zybo Z7-20 / PYNQ 3.0.1 context, overlay load, file-fed first-light run, live V4L2 camera run, and a PL frame-evaluation latency (engine scan + spike-FIFO drain) around 320-340 us. The end-to-end live loop is camera-bound (~30 fps); see the per-stage timing benchmark in `docs/validation/README.md`.

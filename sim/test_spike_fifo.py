@@ -75,6 +75,66 @@ async def test_fifo_simultaneous_rw_full(dut):
     
     dut._log.info("Simultaneous read/write on full FIFO test PASSED!")
 
+
+@cocotb.test()
+async def test_fifo_overflow_drops_excess(dut):
+    """Writes past FIFO_DEPTH with reads disabled are dropped, overflow_seen latches,
+    and only the first FIFO_DEPTH entries survive (in order). This covers the spike
+    drop/overflow path that used to be exercised via back-to-back frames at the
+    wrapper level, which start-gating now (correctly) makes unreachable."""
+    cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
+
+    dut.rst_n.value = 0
+    dut.wr_en.value = 0
+    dut.rd_en.value = 0
+    dut.din.value = 0
+    dut.clear_overflow.value = 0
+    await RisingEdge(dut.clk)
+    dut.rst_n.value = 1
+    await RisingEdge(dut.clk)
+
+    # 1. Fill the FIFO exactly to capacity (0..15) -- no overflow yet.
+    for i in range(16):
+        dut.din.value = i
+        dut.wr_en.value = 1
+        await RisingEdge(dut.clk)
+    dut.wr_en.value = 0
+    await RisingEdge(dut.clk)
+    assert dut.full.value == 1, "FIFO should be full after 16 writes"
+    assert dut.overflow_seen.value == 0, "Overflow should not be seen at exactly full"
+
+    # 2. Push 5 more while full with reads disabled -- these must be DROPPED.
+    for j in range(16, 21):
+        dut.din.value = j
+        dut.wr_en.value = 1
+        await RisingEdge(dut.clk)
+    dut.wr_en.value = 0
+    await RisingEdge(dut.clk)
+    assert dut.overflow_seen.value == 1, "overflow_seen should latch after dropped writes"
+    assert dut.full.value == 1, "FIFO should still be exactly full (no extra entries)"
+
+    # 3. Clear the sticky overflow flag.
+    dut.clear_overflow.value = 1
+    await RisingEdge(dut.clk)
+    dut.clear_overflow.value = 0
+    await RisingEdge(dut.clk)
+    assert dut.overflow_seen.value == 0, "overflow_seen should clear on clear_overflow"
+
+    # 4. Drain and confirm only the first 16 (0..15) survived, in order.
+    results = []
+    dut.rd_en.value = 1
+    for _ in range(16):
+        await RisingEdge(dut.clk)
+        await Timer(1, "ns")
+        results.append(int(dut.dout.value))
+    dut.rd_en.value = 0
+    await RisingEdge(dut.clk)
+
+    assert results == list(range(16)), f"Expected 0..15 survived, got {results}"
+    assert dut.empty.value == 1, "FIFO should be empty after draining 16 entries"
+    dut._log.info("Overflow drop test PASSED: excess writes dropped, first 16 preserved.")
+
+
 def fifo_runner():
     from cocotb_tools.runner import get_runner
     hdl_toplevel = "spike_fifo"

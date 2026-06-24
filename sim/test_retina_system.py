@@ -94,9 +94,11 @@ async def test_full_frame(dut):
                 
     cocotb.start_soon(spike_monitor())
 
-    # Run for 300 frames to see movement and spiking
-    dut._log.info("Starting Visualizer Demo (300 frames)...")
-    for f in range(300):
+    # Run enough frames to see movement and spiking. Keep the long default for
+    # regression, but allow shorter diagnostic runs during bringup.
+    num_frames = int(os.getenv("RETINA_TEST_FRAMES", "300"))
+    dut._log.info(f"Starting Visualizer Demo ({num_frames} frames)...")
+    for f in range(num_frames):
         # Update biological stimulus
         current_frame = sensor.get_frame()
         
@@ -119,8 +121,16 @@ async def test_full_frame(dut):
         if f % 20 == 0:
             dut._log.info(f"Frame {f} rendered.")
         
-        # We don't need a full 1ms delay in simulation realtime, just let the loop run as fast as possible
-        await Timer(1, unit="us") 
+        # With one TLAST-delimited packet per frame, spikes drain after
+        # frame_done. Wait for the controller to deassert `busy` (scan finished
+        # AND packet drained) before the next start; starting while busy would
+        # clear the drain gate and cut the in-flight packet's TLAST.
+        for _ in range(20000):
+            await RisingEdge(dut.clk)
+            if dut.busy.value == 0:
+                break
+        else:
+            raise AssertionError("Timed out waiting for drain (busy)")
 
     dut._log.info("Visualizer Demo Complete.")
 

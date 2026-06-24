@@ -1,0 +1,6 @@
+# Python dependencies for the cocotb RTL regression (`make verify`).
+# Pinned to the versions used for local + CI runs.
+cocotb==2.0.1
+cocotb-coverage==2.0.0
+cocotbext-axi==0.1.28
+numpy==2.4.6

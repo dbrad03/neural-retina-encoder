@@ -18,8 +18,10 @@ Register map (from hdl/axi_retina_wrapper.sv, verified against system.hwh):
   AXI-Stream FIFO base 0x43C00000 (Xilinx axi_fifo_mm_s)
     0x1C RDFO : receive occupancy IN WORDS  (NOT bytes -> do not /4)
     0x20 RDFD : receive data
-    0x24 RLR  : receive length in bytes (only meaningful with TLAST; our
-                stream has NO TLAST, so we drain by RDFO occupancy instead)
+    0x24 RLR  : receive length in bytes (valid once a TLAST packet is present).
+                The stream asserts one TLAST per frame, so we drain by reading
+                RLR for the packet's byte length -- but ONLY when RDFO>0, since
+                RLR on an empty FIFO returns SLVERR/SIGBUS.
 
 Usage:
     sudo python3 first_light.py <host_ip> [image.png]

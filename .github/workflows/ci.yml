@@ -1,0 +1,98 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  rtl-regression:
+    name: Cocotb RTL regression (Icarus)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # ubuntu-latest's apt ships Icarus 12, which can't elaborate the package
+      # functions (s2c/c2s/fp_mul) reached via `import izh_pkg::*` -- fixed in
+      # Icarus 13. Build 13.0 from source (cached across runs) to match local.
+      - name: Cache Icarus Verilog 13
+        id: cache-iverilog
+        uses: actions/cache@v4
+        with:
+          path: /opt/iverilog13
+          key: iverilog-13_0-${{ runner.os }}
+
+      - name: Build Icarus Verilog 13
+        if: steps.cache-iverilog.outputs.cache-hit != 'true'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y autoconf gperf flex bison g++ make git
+          git clone --depth 1 --branch v13_0 https://github.com/steveicarus/iverilog.git /tmp/iverilog
+          cd /tmp/iverilog
+          sh autoconf.sh
+          ./configure --prefix=/opt/iverilog13
+          make -j"$(nproc)"
+          make install
+
+      - name: Add Icarus 13 to PATH
+        run: |
+          echo "/opt/iverilog13/bin" >> "$GITHUB_PATH"
+          /opt/iverilog13/bin/iverilog -V | head -1
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Install Python dependencies
+        run: |
+          python -m venv .venv
+          .venv/bin/pip install --upgrade pip
+          .venv/bin/pip install -r sim/requirements.txt
+
+      # The Makefile recipe sources ../.venv/bin/activate (a bash builtin), so
+      # run make with bash and a shortened integration test to keep CI fast.
+      - name: Run cocotb regression
+        run: make -C sim SHELL=/bin/bash verify
+        env:
+          RETINA_TEST_FRAMES: '60'
+
+      - name: Run functional coverage
+        run: make -C sim SHELL=/bin/bash coverage
+
+      - name: Upload functional coverage reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: functional-coverage
+          path: |
+            coverage_build/functional_coverage.yml
+            coverage_build/functional_coverage.md
+          if-no-files-found: error
+
+      - name: Compile-check V4L2 driver
+        run: gcc -Wall -Wextra -std=c11 -c sw/v4l2_driver/retina_v4l2.c -o /tmp/retina_v4l2.o
+
+  lint:
+    name: Verilator lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Verilator
+        run: sudo apt-get update && sudo apt-get install -y verilator
+
+      # Gating lint. WIDTHTRUNC (potential data loss) is fixed in the RTL.
+      # Suppressed classes are benign/stylistic: TIMESCALEMOD (cocotb sets the
+      # timescale at build), IMPORTSTAR (intentional izh_pkg import), WIDTHEXPAND
+      # (safe zero-extend in comparisons), plus naming/unused/empty-pin style.
+      - name: Lint RTL
+        run: |
+          verilator --lint-only -Wall -sv \
+            -Wno-TIMESCALEMOD -Wno-IMPORTSTAR -Wno-WIDTHEXPAND \
+            -Wno-DECLFILENAME -Wno-UNUSEDSIGNAL -Wno-UNUSEDPARAM \
+            -Wno-PINCONNECTEMPTY -Wno-VARHIDDEN \
+            hdl/izh_pkg.sv hdl/izh_neuron_engine.sv hdl/neuron_state_mem.sv \
+            hdl/spike_fifo.sv hdl/axis_pixel_ingress.sv \
+            hdl/neuron_array_controller.sv hdl/axi_retina_wrapper.sv \
+            --top-module axi_retina_wrapper
