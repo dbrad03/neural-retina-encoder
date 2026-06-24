@@ -59,6 +59,12 @@ module neuron_array_controller #(
     // immediately after frame_done.
     wire                 drain_done = frame_complete && fifo_empty && !spike_valid;
     assign busy = frame_active;
+    // Qualified start: a start_frame is ACCEPTED only when the controller is idle
+    // (not scanning or draining). A start while busy is silently ignored so it
+    // cannot restart the scan mid-drain or clear frame_complete and cut the
+    // in-flight packet's TLAST. Software polls !busy before starting, so this is
+    // byte-identical for correct operation and only rejects out-of-contract starts.
+    wire                 start_qual = start_frame && !frame_active;
     logic [ADDR_WIDTH-1:0] addr_pipe [7]; 
     logic                  start_pipe [7]; 
 
@@ -160,7 +166,7 @@ module neuron_array_controller #(
             frame_done <= 1'b0;
             case (state)
                 IDLE: begin
-                    if (start_frame) begin
+                    if (start_qual) begin
                         state <= SCANNING;
                         scan_cnt <= '0;
                         done_cnt <= '0;
@@ -221,18 +227,18 @@ module neuron_array_controller #(
     // TLAST lets the downstream axi_fifo_mm_s commit the frame as one packet.
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n)            frame_complete <= 1'b0;
-        else if (start_frame)  frame_complete <= 1'b0;  // new frame: re-arm
+        else if (start_qual)   frame_complete <= 1'b0;  // new frame: re-arm
         else if (frame_done)   frame_complete <= 1'b1;  // scan finished
     end
 
-    // busy: high from a start through end-of-drain. This is an OBSERVABILITY
-    // signal (status bit7) -- starts are NOT gated on it, since the design
-    // intentionally allows back-to-back frames. Software should poll !busy before
-    // the next start to avoid clearing frame_complete mid-drain (which would cut
-    // the in-flight packet's TLAST).
+    // busy: high from a start through end-of-drain, exposed as status bit7. Starts
+    // ARE gated on it (see start_qual): a start_frame while busy is ignored, so an
+    // out-of-contract start can no longer restart the scan mid-drain or sever the
+    // in-flight packet's TLAST. Software still polls !busy before the next start;
+    // the gate is a hardware backstop, not a substitute for that handshake.
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n)            frame_active <= 1'b0;
-        else if (start_frame)  frame_active <= 1'b1;
+        else if (start_qual)   frame_active <= 1'b1;
         else if (drain_done)   frame_active <= 1'b0;
     end
 
